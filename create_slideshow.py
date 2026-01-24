@@ -33,8 +33,13 @@ def main():
 TOPIC: {topic}
 """, temp_history=[])
 
-    # Clean response (remove markdown code blocks if present)
+    # Clean response (remove model header like [model-name] if present)
     json_str = response.strip()
+    if json_str.startswith("[") and "]" in json_str[:50]:
+        # Handle cases where multiple headers might exist or the header is long
+        json_str = re.sub(r"^\[.*?\]\s*", "", json_str)
+
+    # Clean response (remove markdown code blocks if present)
     if "```json" in json_str:
         json_str = json_str.split("```json")[1].split("```")[0]
     elif "```" in json_str:
