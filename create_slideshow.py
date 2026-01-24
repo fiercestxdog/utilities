@@ -1,63 +1,71 @@
 """Generate an HTML slideshow from a topic using LLM."""
 import sys
+import re
+import json
 sys.path.insert(0, r"C:\python")
 from tools.ai_chat.llm_engine import LLMEngine
 from pathlib import Path
 
 PROMPT_FILE = Path(__file__).parent / "PROMPT.md"
+TEMPLATE_FILE = Path(__file__).parent / "sample_presentation.html"
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 def main():
+    if not TEMPLATE_FILE.exists():
+        print(f"Error: Template file not found at {TEMPLATE_FILE}")
+        return
+
     topic = input("What would you like the slideshow topic to be? ").strip()
     if not topic:
         print("No topic provided. Exiting.")
         return
 
     llm = LLMEngine()
-    print(f"\nGenerating slides for: {topic}...")
+    print(f"\nGenerating slide content for: {topic}...")
 
-    # Step 1: Generate slide content
-    slides = llm.chat(f"""Create 5-7 slides for a presentation about: {topic}
+    # Load the system prompt
+    system_prompt = PROMPT_FILE.read_text(encoding='utf-8')
 
-Use this exact format:
-[SLIDE 1: Title]
-- Bullet point
-- Another point
+    # Generate JSON content
+    response = llm.chat(f"""{system_prompt}
 
-[SLIDE 2: Next Title]
-- Content here
+TOPIC: {topic}
+""", temp_history=[])
 
-IMPORTANT: Use plain text only. Do NOT use markdown like **bold** or *italics*.
-Include an intro slide, 3-5 content slides, and a conclusion/summary slide.""", temp_history=[])
+    # Clean response (remove markdown code blocks if present)
+    json_str = response.strip()
+    if "```json" in json_str:
+        json_str = json_str.split("```json")[1].split("```")[0]
+    elif "```" in json_str:
+        json_str = json_str.split("```")[1].split("```")[0]
+    
+    json_str = json_str.strip()
 
-    print("Slides generated. Creating HTML...")
+    # Validate JSON
+    try:
+        slide_data = json.loads(json_str)
+        print(f"Successfully generated {len(slide_data)} slides.")
+    except json.JSONDecodeError as e:
+        print(f"Error parsing LLM response as JSON: {e}")
+        print("Raw response preview:", json_str[:500])
+        return
 
-    # Step 2: Generate HTML using the prompt template
-    prompt_template = PROMPT_FILE.read_text(encoding='utf-8')
-    html = llm.chat(f"""{prompt_template}
+    # Read Template
+    template_content = TEMPLATE_FILE.read_text(encoding='utf-8')
 
----
-## SLIDE CONTENT TO USE:
-
-{slides}
-
-Generate the complete HTML file now. Output ONLY the HTML code, no explanation.""", temp_history=[])
-
-    # Extract HTML from response (handle markdown code blocks)
-    if "```html" in html:
-        html = html.split("```html")[1].split("```")[0]
-    elif "```" in html:
-        html = html.split("```")[1].split("```")[0]
-
-    # Remove any LLM header like [model-name]
-    if html.strip().startswith("[") and "]" in html[:50]:
-        html = html.split("]", 1)[1]
+    # Inject JSON into template using Regex
+    # Matches: const slides = [ ... ]; (dotall to match newlines)
+    # We use a specific lookahead/behind or just replace the variable assignment
+    pattern = r"const\s+slides\s*=\s*\[.*?\];"
+    replacement = f"const slides = {json.dumps(slide_data, indent=4)};"
+    
+    new_html = re.sub(pattern, replacement, template_content, flags=re.DOTALL)
 
     # Save
     safe_name = "".join(c if c.isalnum() or c in " -_" else "" for c in topic)[:40].strip().replace(" ", "_")
     output_file = OUTPUT_DIR / f"{safe_name}.html"
-    output_file.write_text(html.strip(), encoding='utf-8')
+    output_file.write_text(new_html, encoding='utf-8')
 
     print(f"\nSlideshow saved to: {output_file}")
 
