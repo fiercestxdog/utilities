@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample Presentation</title>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+        /* =========================
+           1. CSS Variables / Theme
+           ========================= */
+        :root {
+            --sidebar-bg: #1a1a2e;
+            --sidebar-width: 250px;
+            --sidebar-text: #a0a0b0;
+            --sidebar-active: #4fc3f7;
+            --slide-bg: #ffffff;
+            --slide-text: #2d2d2d;
+            --accent: #4fc3f7;
+            --accent-hover: #29b6f6;
+            --control-bg: #f5f5f5;
+            --progress-bg: #e0e0e0;
+            --transition-duration: 300ms;
+        }
+
+        /* =========================
+           2. Reset & Base Styles
+           ========================= */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0f0f1a;
+            color: var(--slide-text);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* =========================
+           3. Layout (Sidebar, Main)
+           ========================= */
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #2a2a4a;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-header h2 {
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .sidebar-item {
+            padding: 12px 20px;
+            color: var(--sidebar-text);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+            font-size: 0.9rem;
+        }
+
+        .sidebar-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+
+        .sidebar-item.active {
+            background: rgba(79, 195, 247, 0.1);
+            color: var(--sidebar-active);
+            border-left-color: var(--sidebar-active);
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #12121f;
+            min-width: 0;
+        }
+
+        /* =========================
+           4. Slide Styles
+           ========================= */
+        .slide-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            overflow: hidden;
+        }
+
+        .slide-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 960px;
+            aspect-ratio: 16 / 9;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--slide-bg);
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            padding: 50px 60px;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity var(--transition-duration) ease,
+                        transform var(--transition-duration) ease;
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .slide-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--sidebar-bg);
+            margin-bottom: 30px;
+            border-bottom: 3px solid var(--accent);
+            padding-bottom: 15px;
+        }
+
+        .slide-content {
+            flex: 1;
+            font-size: 1.3rem;
+            line-height: 1.8;
+        }
+
+        .slide-content ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .slide-content li {
+            padding: 8px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .slide-content li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+
+        .slide-content li.sub-item {
+            padding-left: 60px;
+            font-size: 1.1rem;
+            color: #555;
+        }
+
+        .slide-content li.sub-item::before {
+            left: 30px;
+            width: 6px;
+            height: 6px;
+            background: #999;
+        }
+
+        /* =========================
+           5. Navigation Controls
+           ========================= */
+        .controls {
+            background: var(--control-bg);
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .progress-container {
+            flex: 1;
+            max-width: 400px;
+            height: 6px;
+            background: var(--progress-bg);
+            border-radius: 3px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .nav-buttons {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.2s ease;
+        }
+
+        .nav-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .nav-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .slide-counter {
+            font-size: 0.95rem;
+            color: #666;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .fullscreen-btn, .export-btn {
+            background: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .fullscreen-btn:hover, .export-btn:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* =========================
+           6. Transitions
+           ========================= */
+        /* Fade */
+        .transition-fade .slide {
+            transform: none;
+        }
+
+        /* Slide Left */
+        .transition-slide-left .slide {
+            transform: translateX(50px);
+        }
+        .transition-slide-left .slide.active {
+            transform: translateX(0);
+        }
+        .transition-slide-left .slide.exit-left {
+            transform: translateX(-50px);
+        }
+
+        /* Slide Up */
+        .transition-slide-up .slide {
+            transform: translateY(50px);
+        }
+        .transition-slide-up .slide.active {
+            transform: translateY(0);
+        }
+        .transition-slide-up .slide.exit-up {
+            transform: translateY(-50px);
+        }
+
+        /* =========================
+           7. Responsive / Mobile
+           ========================= */
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
+            background: var(--sidebar-bg);
+            border: none;
+            color: #fff;
+            padding: 10px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100%;
+                z-index: 999;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .mobile-toggle {
+                display: block;
+            }
+
+            .slide-container {
+                padding: 15px;
+            }
+
+            .slide {
+                padding: 30px;
+            }
+
+            .slide-title {
+                font-size: 1.5rem;
+            }
+
+            .slide-content {
+                font-size: 1rem;
+            }
+
+            .controls {
+                flex-wrap: wrap;
+                padding: 10px 15px;
+                gap: 10px;
+            }
+
+            .progress-container {
+                order: -1;
+                width: 100%;
+                max-width: none;
+            }
+        }
+
+        /* Fullscreen mode */
+        .fullscreen .sidebar {
+            display: none;
+        }
+
+        .fullscreen .slide-container {
+            padding: 20px;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+        }
+
+        .overlay.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <button class="mobile-toggle" onclick="toggleSidebar()">&#9776;</button>
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <div class="container">
+        <!-- Sidebar / Agenda -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Agenda</h2>
+            </div>
+            <nav class="sidebar-nav" id="sidebarNav">
+                <!-- Generated dynamically -->
+            </nav>
+        </aside>
+
+        <!-- Main Viewer -->
+        <main class="main">
+            <div class="slide-container">
+                <div class="slide-wrapper transition-fade" id="slideWrapper">
+                    <!-- Slides generated dynamically -->
+                </div>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div class="controls">
+                <div class="progress-container" id="progressContainer" onclick="handleProgressClick(event)">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="nav-buttons">
+                    <button class="nav-btn" id="prevBtn" onclick="prevSlide()">&#8592; Prev</button>
+                    <span class="slide-counter" id="slideCounter">1 / 5</span>
+                    <button class="nav-btn" id="nextBtn" onclick="nextSlide()">Next &#8594;</button>
+                    <button class="fullscreen-btn" onclick="toggleFullscreen()">Fullscreen</button>
+                    <button class="export-btn" onclick="exportSlide()">Export PNG</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // =========================
+        // CONFIG
+        // =========================
+        const CONFIG = {
+            transition: 'fade',        // 'none' | 'fade' | 'slide-left' | 'slide-up'
+            transitionDuration: 300,   // milliseconds
+            startSlide: 1
+        };
+
+        // =========================
+        // SLIDE DATA
+        // =========================
+        const slides = [
+            {
+                title: "Welcome to PowerPoint Viewer",
+                content: `
+                    <ul>
+                        <li>A lightweight HTML presentation viewer</li>
+                        <li>No dependencies required (except html2canvas for export)</li>
+                        <li>Works offline in any modern browser</li>
+                        <li>Keyboard and touch navigation</li>
+                    </ul>
+                `
+            },
+            {
+                title: "Navigation Features",
+                content: `
+                    <ul>
+                        <li>Arrow keys to navigate slides</li>
+                        <li class="sub-item">Right/Down/Space/PageDown for next</li>
+                        <li class="sub-item">Left/Up/PageUp for previous</li>
+                        <li>Home/End to jump to first/last slide</li>
+                        <li>Number keys (1-9) for quick jumps</li>
+                        <li>Click agenda items to jump directly</li>
+                    </ul>
+                `
+            },
+            {
+                title: "Touch & Mobile Support",
+                content: `
+                    <ul>
+                        <li>Swipe left for next slide</li>
+                        <li>Swipe right for previous slide</li>
+                        <li>Responsive layout adapts to screen size</li>
+                        <li>Collapsible sidebar on mobile devices</li>
+                        <li>Touch-friendly navigation buttons</li>
+                    </ul>
+                `
+            },
+            {
+                title: "Transitions & Effects",
+                content: `
+                    <ul>
+                        <li>Multiple transition styles available:</li>
+                        <li class="sub-item">Fade (smooth opacity change)</li>
+                        <li class="sub-item">Slide Left (horizontal motion)</li>
+                        <li class="sub-item">Slide Up (vertical motion)</li>
+                        <li class="sub-item">None (instant switch)</li>
+                        <li>Configurable transition duration</li>
+                    </ul>
+                `
+            },
+            {
+                title: "Additional Features",
+                content: `
+                    <ul>
+                        <li>Deep linking via URL hash (#slide-3)</li>
+                        <li>Progress bar shows current position</li>
+                        <li>Click progress bar to jump to position</li>
+                        <li>Fullscreen mode (F key or button)</li>
+                        <li>Export current slide as PNG image</li>
+                    </ul>
+                `
+            }
+        ];
+
+        // =========================
+        // STATE
+        // =========================
+        let currentSlide = 0;
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        // =========================
+        // INITIALIZATION
+        // =========================
+        function init() {
+            // Apply transition class
+            const wrapper = document.getElementById('slideWrapper');
+            wrapper.className = `slide-wrapper transition-${CONFIG.transition}`;
+
+            // Set CSS transition duration
+            document.documentElement.style.setProperty('--transition-duration', `${CONFIG.transitionDuration}ms`);
+
+            // Generate slides
+            generateSlides();
+            generateSidebar();
+
+            // Check for hash in URL
+            const hash = window.location.hash;
+            if (hash && hash.startsWith('#slide-')) {
+                const slideNum = parseInt(hash.replace('#slide-', ''));
+                if (slideNum >= 1 && slideNum <= slides.length) {
+                    currentSlide = slideNum - 1;
+                }
+            } else {
+                currentSlide = CONFIG.startSlide - 1;
+            }
+
+            // Show initial slide
+            showSlide(currentSlide);
+
+            // Setup event listeners
+            setupKeyboardNav();
+            setupTouchNav();
+            setupHashChange();
+        }
+
+        function generateSlides() {
+            const wrapper = document.getElementById('slideWrapper');
+            slides.forEach((slide, index) => {
+                const slideEl = document.createElement('div');
+                slideEl.className = 'slide';
+                slideEl.id = `slide-${index}`;
+                slideEl.innerHTML = `
+                    <h1 class="slide-title">${slide.title}</h1>
+                    <div class="slide-content">${slide.content}</div>
+                `;
+                wrapper.appendChild(slideEl);
+            });
+        }
+
+        function generateSidebar() {
+            const nav = document.getElementById('sidebarNav');
+            slides.forEach((slide, index) => {
+                const item = document.createElement('div');
+                item.className = 'sidebar-item';
+                item.textContent = `${index + 1}. ${slide.title}`;
+                item.onclick = () => goToSlide(index);
+                nav.appendChild(item);
+            });
+        }
+
+        // =========================
+        // NAVIGATION LOGIC
+        // =========================
+        function showSlide(index) {
+            // Clamp index
+            index = Math.max(0, Math.min(index, slides.length - 1));
+            currentSlide = index;
+
+            // Update slides
+            const allSlides = document.querySelectorAll('.slide');
+            allSlides.forEach((slide, i) => {
+                slide.classList.remove('active', 'exit-left', 'exit-up');
+                if (i === index) {
+                    slide.classList.add('active');
+                }
+            });
+
+            // Update sidebar
+            const sidebarItems = document.querySelectorAll('.sidebar-item');
+            sidebarItems.forEach((item, i) => {
+                item.classList.toggle('active', i === index);
+            });
+
+            // Update counter
+            document.getElementById('slideCounter').textContent = `${index + 1} / ${slides.length}`;
+
+            // Update progress bar
+            const progress = ((index + 1) / slides.length) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+
+            // Update buttons
+            document.getElementById('prevBtn').disabled = index === 0;
+            document.getElementById('nextBtn').disabled = index === slides.length - 1;
+
+            // Update URL hash
+            history.replaceState(null, null, `#slide-${index + 1}`);
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        function goToSlide(index) {
+            showSlide(index);
+            // Close sidebar on mobile
+            if (window.innerWidth <= 768) {
+                toggleSidebar();
+            }
+        }
+
+        function handleProgressClick(event) {
+            const container = event.currentTarget;
+            const rect = container.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const percentage = x / rect.width;
+            const slideIndex = Math.floor(percentage * slides.length);
+            showSlide(slideIndex);
+        }
+
+        // =========================
+        // KEYBOARD HANDLERS
+        // =========================
+        function setupKeyboardNav() {
+            document.addEventListener('keydown', (e) => {
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case 'ArrowDown':
+                    case ' ':
+                    case 'PageDown':
+                        e.preventDefault();
+                        nextSlide();
+                        break;
+                    case 'ArrowLeft':
+                    case 'ArrowUp':
+                    case 'PageUp':
+                        e.preventDefault();
+                        prevSlide();
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        showSlide(0);
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        showSlide(slides.length - 1);
+                        break;
+                    case 'Escape':
+                        exitFullscreen();
+                        break;
+                    case 'f':
+                    case 'F':
+                        toggleFullscreen();
+                        break;
+                    default:
+                        // Number keys 1-9
+                        if (e.key >= '1' && e.key <= '9') {
+                            const num = parseInt(e.key);
+                            if (num <= slides.length) {
+                                showSlide(num - 1);
+                            }
+                        }
+                }
+            });
+        }
+
+        // =========================
+        // TOUCH HANDLERS
+        // =========================
+        function setupTouchNav() {
+            const wrapper = document.getElementById('slideWrapper');
+
+            wrapper.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+
+            wrapper.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, { passive: true });
+        }
+
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            const diff = touchStartX - touchEndX;
+
+            if (Math.abs(diff) > swipeThreshold) {
+                if (diff > 0) {
+                    nextSlide(); // Swipe left
+                } else {
+                    prevSlide(); // Swipe right
+                }
+            }
+        }
+
+        // =========================
+        // HASH CHANGE HANDLER
+        // =========================
+        function setupHashChange() {
+            window.addEventListener('hashchange', () => {
+                const hash = window.location.hash;
+                if (hash && hash.startsWith('#slide-')) {
+                    const slideNum = parseInt(hash.replace('#slide-', ''));
+                    if (slideNum >= 1 && slideNum <= slides.length) {
+                        showSlide(slideNum - 1);
+                    }
+                }
+            });
+        }
+
+        // =========================
+        // FULLSCREEN
+        // =========================
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                document.body.classList.add('fullscreen');
+            } else {
+                exitFullscreen();
+            }
+        }
+
+        function exitFullscreen() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+            document.body.classList.remove('fullscreen');
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                document.body.classList.remove('fullscreen');
+            }
+        });
+
+        // =========================
+        // MOBILE SIDEBAR TOGGLE
+        // =========================
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+        }
+
+        // =========================
+        // EXPORT FUNCTIONALITY
+        // =========================
+        function exportSlide() {
+            const slideEl = document.querySelector('.slide.active');
+            if (!slideEl) return;
+
+            html2canvas(slideEl, {
+                backgroundColor: '#ffffff',
+                scale: 2
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `slide-${currentSlide + 1}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(err => {
+                console.error('Export failed:', err);
+                alert('Failed to export slide. Check console for details.');
+            });
+        }
+
+        // =========================
+        // START
+        // =========================
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
