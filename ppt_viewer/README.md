@@ -27,6 +27,19 @@ Enter a topic when prompted, and the script will:
 2. Inject it into the HTML template
 3. Save to `output/<topic>.html`
 
+### OpenWebUI Integration
+
+1. Go to Admin → Functions → Add Function
+2. Paste the contents of `openwebui_tool.py`
+3. Configure valves (optional):
+   - `output_dir`: Where to save HTML files
+   - `base_url`: URL prefix for accessing saved files
+4. Enable the tool
+
+The tool provides two functions:
+- `generate_slideshow(topic)` - Returns instructions for the LLM to create slide JSON
+- `render_slideshow(slides_json, title)` - Converts JSON into complete HTML
+
 ### Manual (Copy Prompt)
 
 1. Copy the contents of `PROMPT.md` to your LLM
@@ -40,7 +53,19 @@ Enter a topic when prompted, and the script will:
 | `PROMPT.md` | LLM prompt for generating slide JSON |
 | `create_slideshow.py` | Python script to automate generation |
 | `sample_presentation.html` | HTML template with all features |
+| `openwebui_tool.py` | OpenWebUI tool integration |
+| `sync_template.py` | Sync HTML template changes to OpenWebUI tool |
+| `test_openwebui_tool.py` | Test suite for OpenWebUI tool |
 | `output/` | Generated slideshows |
+
+## Development
+
+After modifying `sample_presentation.html`, sync changes to the OpenWebUI tool:
+
+```bash
+python sync_template.py
+python test_openwebui_tool.py  # Verify
+```
 
 ## Keyboard Shortcuts
 
