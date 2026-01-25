@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Prompt Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.8rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .search-box:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.5);
+        }
+
+        .theme-filter {
+            padding: 0.8rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+            min-width: 150px;
+        }
+
+        .favorites-toggle {
+            padding: 0.8rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .favorites-toggle.active {
+            background: #ffd700;
+            color: #333;
+        }
+
+        .favorites-toggle:hover {
+            transform: scale(1.02);
+        }
+
+        /* Keyboard hint */
+        .keyboard-hint {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.85rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .keyboard-hint kbd {
+            background: rgba(255,255,255,0.2);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+
+        .card-favorite {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0.3;
+            transition: all 0.2s;
+        }
+
+        .card-favorite:hover,
+        .card-favorite.active {
+            opacity: 1;
+        }
+
+        .card-favorite.active {
+            color: #ffd700;
+        }
+
+        .card-theme {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            background: #667eea;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .card-title {
+            font-size: 1.4rem;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            padding-right: 2rem;
+        }
+
+        .card-preview {
+            color: #718096;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 2.5rem;
+            max-width: 700px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #718096;
+            line-height: 1;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+        }
+
+        .modal-close:hover {
+            color: #2d3748;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .modal-theme {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            background: #667eea;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .modal-favorite {
+            font-size: 1.5rem;
+            cursor: pointer;
+            opacity: 0.3;
+            transition: all 0.2s;
+        }
+
+        .modal-favorite:hover,
+        .modal-favorite.active {
+            opacity: 1;
+            color: #ffd700;
+        }
+
+        .modal-title {
+            font-size: 2rem;
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-description {
+            color: #4a5568;
+            font-size: 1.05rem;
+            line-height: 1.7;
+            margin-bottom: 2rem;
+            white-space: pre-line;
+        }
+
+        .modal-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .modal-nav-btn {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #4a5568;
+            transition: all 0.2s;
+        }
+
+        .modal-nav-btn:hover:not(:disabled) {
+            background: #edf2f7;
+        }
+
+        .modal-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .copy-btn {
+            flex: 1;
+            background: #48bb78;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .copy-btn:hover {
+            background: #38a169;
+            transform: scale(1.02);
+        }
+
+        .copy-btn.copied {
+            background: #2f855a;
+        }
+
+        .submit-btn {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .submit-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: white;
+            padding: 3rem;
+        }
+
+        .empty-state h2 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #2d3748;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 2000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Results count */
+        .results-count {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .filters {
+                flex-direction: column;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .keyboard-hint {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Work Prompt Generator</h1>
+
+        <div class="filters">
+            <input type="text" class="search-box" id="searchBox" placeholder="Search prompts... (press /)" autocomplete="off">
+            <select class="theme-filter" id="themeFilter">
+                <option value="">All Themes</option>
+            </select>
+            <button class="favorites-toggle" id="favoritesToggle" onclick="toggleFavoritesFilter()">
+                <span>&#9733;</span> Favorites
+            </button>
+        </div>
+
+        <div class="keyboard-hint">
+            <kbd>/</kbd> Search &nbsp; <kbd>Esc</kbd> Close &nbsp; <kbd>C</kbd> Copy &nbsp; <kbd>&larr;</kbd> <kbd>&rarr;</kbd> Navigate
+        </div>
+
+        <div class="results-count" id="resultsCount"></div>
+        <div class="cards-grid" id="cardsGrid"></div>
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <h2>No prompts found</h2>
+            <p>Try adjusting your search or filters</p>
+        </div>
+    </div>
+
+    <div class="modal" id="promptModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <div class="modal-header">
+                <span class="modal-theme" id="modalTheme"></span>
+                <span class="modal-favorite" id="modalFavorite" onclick="toggleModalFavorite()">&#9733;</span>
+            </div>
+            <h2 class="modal-title" id="modalTitle"></h2>
+            <div class="modal-description" id="modalDescription"></div>
+            <div class="modal-nav">
+                <button class="modal-nav-btn" id="prevBtn" onclick="navigatePrompt(-1)">&larr; Previous</button>
+                <span id="modalCounter"></span>
+                <button class="modal-nav-btn" id="nextBtn" onclick="navigatePrompt(1)">Next &rarr;</button>
+            </div>
+            <div class="button-group">
+                <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">
+                    <span>&#128203;</span> Copy to Clipboard
+                </button>
+                <button class="submit-btn" onclick="submitPrompt()">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Embedded prompts (fallback for local file access)
+        const EMBEDDED_PROMPTS = [
+            {
+                "theme": "Leadership",
+                "title": "Quarterly Team Review",
+                "details": "Conduct a comprehensive review of your team's performance over the past quarter. Consider:\n\n• Individual contributions and growth areas\n• Team collaboration and dynamics\n• Key achievements and milestones\n• Challenges faced and how they were overcome\n• Goals for the next quarter\n\nPrepare actionable feedback for each team member and identify opportunities for professional development."
+            },
+            {
+                "theme": "Strategy",
+                "title": "Competitive Analysis",
+                "details": "Analyze your top 3 competitors and identify:\n\n• Their unique value propositions\n• Market positioning and target audience\n• Strengths and weaknesses\n• Recent product launches or strategic moves\n• Opportunities for differentiation\n\nCreate a one-page summary with recommendations for maintaining competitive advantage."
+            },
+            {
+                "theme": "Innovation",
+                "title": "Process Improvement Initiative",
+                "details": "Identify one recurring bottleneck or inefficiency in your current workflow. Document:\n\n• The current process and pain points\n• Impact on productivity and team morale\n• Root causes of the inefficiency\n• Proposed solution with implementation steps\n• Expected outcomes and metrics for success\n\nPresent your findings to stakeholders and seek buy-in for implementation."
+            },
+            {
+                "theme": "Communication",
+                "title": "Stakeholder Update",
+                "details": "Draft a comprehensive update for key stakeholders covering:\n\n• Project status and milestones achieved\n• Current challenges and mitigation strategies\n• Resource needs and allocation\n• Timeline adjustments (if any)\n• Next steps and expected deliverables\n\nEnsure the communication is clear, concise, and addresses potential concerns proactively."
+            },
+            {
+                "theme": "Professional Development",
+                "title": "Skill Gap Analysis",
+                "details": "Evaluate your current skill set against your career goals:\n\n• List technical and soft skills you possess\n• Identify skills needed for your target role\n• Determine gaps and prioritize by importance\n• Research learning resources and training opportunities\n• Create a 90-day development plan\n\nSchedule time to discuss your development plan with your manager."
+            },
+            {
+                "theme": "Productivity",
+                "title": "Time Audit Challenge",
+                "details": "Track how you spend your time over one full work week:\n\n• Categorize activities (meetings, focused work, emails, etc.)\n• Identify time drains and low-value activities\n• Calculate time spent on strategic vs. tactical work\n• Determine optimal times for deep work\n• Create a revised schedule that aligns with priorities\n\nImplement changes and measure impact after two weeks."
+            }
+        ];
+
+        // State
+        let prompts = [];
+        let filteredPrompts = [];
+        let currentPromptIndex = null;
+        let favorites = JSON.parse(localStorage.getItem('promptFavorites')) || [];
+        let showOnlyFavorites = false;
+
+        // Load prompts from prompts.json (falls back to embedded)
+        async function loadPrompts() {
+            try {
+                const response = await fetch('prompts.json');
+                if (!response.ok) throw new Error('Fetch failed');
+                prompts = await response.json();
+            } catch (error) {
+                console.log('Using embedded prompts (fetch failed or local file access)');
+                prompts = EMBEDDED_PROMPTS;
+            }
+            populateThemeFilter();
+            filterAndRender();
+        }
+
+        // Populate theme dropdown
+        function populateThemeFilter() {
+            const themes = [...new Set(prompts.map(p => p.theme))].sort();
+            const select = document.getElementById('themeFilter');
+            themes.forEach(theme => {
+                const option = document.createElement('option');
+                option.value = theme;
+                option.textContent = theme;
+                select.appendChild(option);
+            });
+        }
+
+        // Filter prompts based on search, theme, and favorites
+        function filterAndRender() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            const themeFilter = document.getElementById('themeFilter').value;
+
+            filteredPrompts = prompts.filter(prompt => {
+                const matchesSearch = !searchTerm ||
+                    prompt.title.toLowerCase().includes(searchTerm) ||
+                    prompt.details.toLowerCase().includes(searchTerm) ||
+                    prompt.theme.toLowerCase().includes(searchTerm);
+
+                const matchesTheme = !themeFilter || prompt.theme === themeFilter;
+
+                const matchesFavorites = !showOnlyFavorites || isFavorite(prompt);
+
+                return matchesSearch && matchesTheme && matchesFavorites;
+            });
+
+            // Sort favorites to top
+            filteredPrompts.sort((a, b) => {
+                const aFav = isFavorite(a) ? 0 : 1;
+                const bFav = isFavorite(b) ? 0 : 1;
+                return aFav - bFav;
+            });
+
+            renderCards();
+        }
+
+        // Check if prompt is favorited
+        function isFavorite(prompt) {
+            return favorites.includes(prompt.title);
+        }
+
+        // Toggle favorite status
+        function toggleFavorite(prompt, event) {
+            if (event) event.stopPropagation();
+
+            const index = favorites.indexOf(prompt.title);
+            if (index > -1) {
+                favorites.splice(index, 1);
+            } else {
+                favorites.push(prompt.title);
+            }
+
+            localStorage.setItem('promptFavorites', JSON.stringify(favorites));
+            filterAndRender();
+            updateModalFavorite();
+        }
+
+        // Toggle favorites filter
+        function toggleFavoritesFilter() {
+            showOnlyFavorites = !showOnlyFavorites;
+            document.getElementById('favoritesToggle').classList.toggle('active', showOnlyFavorites);
+            filterAndRender();
+        }
+
+        // Render cards
+        function renderCards() {
+            const grid = document.getElementById('cardsGrid');
+            const emptyState = document.getElementById('emptyState');
+            const resultsCount = document.getElementById('resultsCount');
+
+            if (!filteredPrompts || filteredPrompts.length === 0) {
+                grid.style.display = 'none';
+                emptyState.style.display = 'block';
+                resultsCount.textContent = '';
+                return;
+            }
+
+            grid.style.display = 'grid';
+            emptyState.style.display = 'none';
+            resultsCount.textContent = `Showing ${filteredPrompts.length} of ${prompts.length} prompts`;
+            grid.innerHTML = '';
+
+            filteredPrompts.forEach((prompt, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = () => openModal(index);
+
+                const preview = prompt.details.length > 100
+                    ? prompt.details.substring(0, 100) + '...'
+                    : prompt.details;
+
+                const isFav = isFavorite(prompt);
+
+                card.innerHTML = `
+                    <span class="card-favorite ${isFav ? 'active' : ''}" onclick="toggleFavorite(filteredPrompts[${index}], event)">&#9733;</span>
+                    <div class="card-theme">${prompt.theme}</div>
+                    <h3 class="card-title">${prompt.title}</h3>
+                    <p class="card-preview">${preview}</p>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        // Open modal
+        function openModal(index) {
+            currentPromptIndex = index;
+            const prompt = filteredPrompts[index];
+
+            document.getElementById('modalTheme').textContent = prompt.theme;
+            document.getElementById('modalTitle').textContent = prompt.title;
+            document.getElementById('modalDescription').textContent = prompt.details;
+            document.getElementById('modalCounter').textContent = `${index + 1} of ${filteredPrompts.length}`;
+
+            updateModalFavorite();
+            updateNavButtons();
+
+            document.getElementById('promptModal').classList.add('active');
+            document.getElementById('copyBtn').innerHTML = '<span>&#128203;</span> Copy to Clipboard';
+            document.getElementById('copyBtn').classList.remove('copied');
+        }
+
+        // Update modal favorite star
+        function updateModalFavorite() {
+            if (currentPromptIndex === null) return;
+            const prompt = filteredPrompts[currentPromptIndex];
+            const star = document.getElementById('modalFavorite');
+            star.classList.toggle('active', isFavorite(prompt));
+        }
+
+        // Toggle favorite from modal
+        function toggleModalFavorite() {
+            if (currentPromptIndex === null) return;
+            toggleFavorite(filteredPrompts[currentPromptIndex]);
+        }
+
+        // Update navigation buttons
+        function updateNavButtons() {
+            document.getElementById('prevBtn').disabled = currentPromptIndex === 0;
+            document.getElementById('nextBtn').disabled = currentPromptIndex === filteredPrompts.length - 1;
+        }
+
+        // Navigate between prompts
+        function navigatePrompt(direction) {
+            const newIndex = currentPromptIndex + direction;
+            if (newIndex >= 0 && newIndex < filteredPrompts.length) {
+                openModal(newIndex);
+            }
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('promptModal').classList.remove('active');
+            currentPromptIndex = null;
+        }
+
+        // Copy to clipboard
+        function copyPrompt() {
+            if (currentPromptIndex === null) return;
+
+            const prompt = filteredPrompts[currentPromptIndex];
+            const text = `${prompt.title}\n\n${prompt.details}`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.innerHTML = '<span>&#10003;</span> Copied!';
+                btn.classList.add('copied');
+                showToast('Copied to clipboard!');
+
+                setTimeout(() => {
+                    btn.innerHTML = '<span>&#128203;</span> Copy to Clipboard';
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                showToast('Failed to copy');
+                console.error('Copy failed:', err);
+            });
+        }
+
+        // Submit prompt (stub)
+        function submitPrompt() {
+            if (currentPromptIndex === null) return;
+            const prompt = filteredPrompts[currentPromptIndex];
+
+            // Stub - implement your submission logic here
+            console.log('Submitting prompt:', prompt);
+            showToast('Submit functionality coming soon!');
+
+            // Example: could open in a new window, send to API, etc.
+            // window.open(`https://your-api.com/submit?prompt=${encodeURIComponent(prompt.details)}`);
+        }
+
+        // Show toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            const modal = document.getElementById('promptModal');
+            const isModalOpen = modal.classList.contains('active');
+            const isSearchFocused = document.activeElement === document.getElementById('searchBox');
+
+            // Global shortcuts
+            if (e.key === '/' && !isModalOpen && !isSearchFocused) {
+                e.preventDefault();
+                document.getElementById('searchBox').focus();
+            }
+
+            if (e.key === 'Escape') {
+                if (isModalOpen) {
+                    closeModal();
+                } else if (isSearchFocused) {
+                    document.getElementById('searchBox').blur();
+                }
+            }
+
+            // Modal shortcuts
+            if (isModalOpen && !isSearchFocused) {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    navigatePrompt(-1);
+                }
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    navigatePrompt(1);
+                }
+                if (e.key === 'c' || e.key === 'C') {
+                    e.preventDefault();
+                    copyPrompt();
+                }
+            }
+        });
+
+        // Event listeners for filters
+        document.getElementById('searchBox').addEventListener('input', filterAndRender);
+        document.getElementById('themeFilter').addEventListener('change', filterAndRender);
+
+        // Close modal on background click
+        document.getElementById('promptModal').addEventListener('click', (e) => {
+            if (e.target.id === 'promptModal') {
+                closeModal();
+            }
+        });
+
+        // Load prompts on page load
+        loadPrompts();
+    </script>
+</body>
+</html>

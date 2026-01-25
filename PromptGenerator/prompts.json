@@ -1,0 +1,32 @@
+[
+  {
+    "theme": "Leadership",
+    "title": "Quarterly Team Review",
+    "details": "Conduct a comprehensive review of your team's performance over the past quarter. Consider:\n\n• Individual contributions and growth areas\n• Team collaboration and dynamics\n• Key achievements and milestones\n• Challenges faced and how they were overcome\n• Goals for the next quarter\n\nPrepare actionable feedback for each team member and identify opportunities for professional development."
+  },
+  {
+    "theme": "Strategy",
+    "title": "Competitive Analysis",
+    "details": "Analyze your top 3 competitors and identify:\n\n• Their unique value propositions\n• Market positioning and target audience\n• Strengths and weaknesses\n• Recent product launches or strategic moves\n• Opportunities for differentiation\n\nCreate a one-page summary with recommendations for maintaining competitive advantage."
+  },
+  {
+    "theme": "Innovation",
+    "title": "Process Improvement Initiative",
+    "details": "Identify one recurring bottleneck or inefficiency in your current workflow. Document:\n\n• The current process and pain points\n• Impact on productivity and team morale\n• Root causes of the inefficiency\n• Proposed solution with implementation steps\n• Expected outcomes and metrics for success\n\nPresent your findings to stakeholders and seek buy-in for implementation."
+  },
+  {
+    "theme": "Communication",
+    "title": "Stakeholder Update",
+    "details": "Draft a comprehensive update for key stakeholders covering:\n\n• Project status and milestones achieved\n• Current challenges and mitigation strategies\n• Resource needs and allocation\n• Timeline adjustments (if any)\n• Next steps and expected deliverables\n\nEnsure the communication is clear, concise, and addresses potential concerns proactively."
+  },
+  {
+    "theme": "Professional Development",
+    "title": "Skill Gap Analysis",
+    "details": "Evaluate your current skill set against your career goals:\n\n• List technical and soft skills you possess\n• Identify skills needed for your target role\n• Determine gaps and prioritize by importance\n• Research learning resources and training opportunities\n• Create a 90-day development plan\n\nSchedule time to discuss your development plan with your manager."
+  },
+  {
+    "theme": "Productivity",
+    "title": "Time Audit Challenge",
+    "details": "Track how you spend your time over one full work week:\n\n• Categorize activities (meetings, focused work, emails, etc.)\n• Identify time drains and low-value activities\n• Calculate time spent on strategic vs. tactical work\n• Determine optimal times for deep work\n• Create a revised schedule that aligns with priorities\n\nImplement changes and measure impact after two weeks."
+  }
+]
