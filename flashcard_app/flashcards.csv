@@ -1,0 +1,60 @@
+What is a primary limitation of TF-IDF when representing the meaning of a sentence?,It relies on word frequencies and ignores the underlying contextual meaning of words.
+Why is Word2Vec considered inferior to LLM embeddings for representing full documents?,It captures relationships between individual words but does not explicitly model context across longer text sequences.
+How do modern LLM embeddings handle the different meanings of a word like 'tree' (natural vs. decision tree)?,They capture contextual semantics to distinguish meaning based on surrounding text.
+What is the primary characteristic of 'conventional' embeddings like FastText compared to LLM embeddings?,"They provide contextless, fixed vector representations of individual words."
+Which Python library is commonly used to load pre-trained models for generating text embeddings?,The `sentence_transformers` library.
+What is the specific dimensionality of the embeddings produced by the `all-MiniLM-L6-v2` model?,$384$-dimensional vectors.
+"In the `sentence_transformers` library, which model method converts a list of strings into numerical vectors?",The `encode()` method.
+What does the `batch_size` parameter in the `model.encode()` method control?,The number of text sequences processed simultaneously during inference for efficiency.
+What expectation exists for the embeddings of two semantically similar documents in vector space?,Their numerical vectors are expected to be positioned close to each other.
+What must a user specify before running the K-Means clustering algorithm?,The number of clusters ($k$) to be identified.
+Which heuristic method can help determine the optimal number of clusters for K-Means when ground-truth labels are unavailable?,The elbow method.
+Term: Adjusted Rand Index (ARI),Definition: A permutation-invariant metric that compares cluster assignments against ground-truth category labels.
+What does an ARI value close to $1$ indicate about clustering performance?,It indicates a strong agreement between the algorithm's clusters and the actual category labels.
+How does DBSCAN differ from K-Means regarding the number of clusters?,DBSCAN automatically infers the number of clusters based on point density rather than requiring a pre-set value.
+"In the DBSCAN algorithm, what does the parameter `eps` represent?",The maximum distance between two samples for one to be considered as in the neighborhood of the other.
+"In DBSCAN, what is the role of the `min_samples` parameter?",It defines the minimum number of points required in a neighborhood to constitute a dense region or cluster.
+Which distance metric is typically more effective for text embeddings when using DBSCAN?,Cosine distance.
+What does a cluster label of $-1$ indicate in Scikit-learn's DBSCAN output?,It identifies the document as a noise point or outlier that does not belong to any cluster.
+Why is dimensionality reduction often performed before visualizing document embeddings?,"To project high-dimensional vectors (e.g., $384$-D) into a $2$D space for human interpretation."
+Which Scikit-learn class is used to perform Principal Component Analysis for dimensionality reduction?,The `PCA` class.
+What are the two main reasons DBSCAN might underperform on text embeddings compared to K-Means?,The curse of dimensionality in high-dimensional spaces and its high sensitivity to hyperparameters.
+Under what structural conditions does K-Means typically perform well for document grouping?,When the clusters are relatively well separated in the vector space.
+What is the purpose of specialized LLM models like `all-miniLM` compared to standard generative models?,They are specifically designed to produce context-enriched numerical output embeddings instead of generating text.
+"In a dataset combining text and numerical features, what is the first step in preparing the text for a Scikit-learn model?",Converting the raw text into LLM embeddings.
+Why is it necessary to scale numerical features like 'account_age_days' before combining them with embeddings?,To prevent features with larger value ranges from dominating the model's learning process.
+Which Scikit-learn tool is used to transform numerical features to have a mean of $0$ and a variance of $1$?,The `StandardScaler` class.
+Which Numpy function is used to concatenate numerical feature matrices and embedding matrices horizontally?,The `hstack()` function.
+What is the function of the `stratify` parameter in `train_test_split()` when dealing with small datasets?,It ensures that the proportion of each class remains consistent across both training and test sets.
+Which ensemble machine learning model was used to classify customer support tickets after feature engineering?,The Random Forest Classifier.
+What constitutes a necessary baseline to quantify the value added by LLM embeddings in a classification task?,Comparing the model's performance against one trained with traditional features like TF-IDF.
+Concept: Silhouette Score,Definition: A metric measuring how similar a document is to its own cluster compared to other clusters.
+"In the context of clustering, what does 'permutation-invariant' mean?",The metric's value remains the same regardless of the specific integer labels assigned to the clusters.
+How many documents were included in the BBC News dataset used for the clustering demonstration?,$2225$ documents.
+What is the advantage of using pre-trained models for generating embeddings in specific domains?,They already contain substantial general language knowledge from being trained on millions of texts.
+"In the customer support ticket example, how many distinct classes were being predicted?",Five classes.
+Term: Feature Engineering with LLMs,Definition: The process of using LLM embeddings as numerically rich input features for downstream machine learning models.
+What does 'semantic intent' refer to in the analysis of customer support tickets?,The underlying meaning or purpose of the ticket beyond the literal words used.
+The high dimensionality of $384$ vectors can make density-based clustering difficult; this phenomenon is known as the _____.,Curse of dimensionality.
+Which Python library provides the implementation for the `LabelEncoder` used to process ground-truth categories?,The `sklearn.preprocessing` module.
+What is the role of the `random_state` parameter in algorithms like PCA and K-Means?,It ensures that the results are reproducible by fixing the seed for random operations.
+"If the embedding matrix has a shape of $(2225, 384)$, what does the number $2225$ represent?",The total number of documents in the collection.
+"In a classification report, what does the 'Support' column represent?",The actual number of occurrences of each class in the specified dataset.
+What does a weighted F1-score of $0.80$ imply in a multi-class problem?,"It indicates the model has achieved a strong balance between precision and recall across classes, adjusted for class size."
+How can one confirm the effectiveness of an LLM-based feature engineering approach beyond a proof of concept?,"By applying the technique to a larger, more robust dataset and tuning the classifier's hyperparameters."
+"Which visualization library was configured using `sns.set_style(""whitegrid"")` in the provided guide?",Seaborn.
+"In the document clustering tutorial, what determined the value of `n_clusters=5` for the K-Means algorithm?",Prior knowledge of the five ground-truth topic categories in the BBC News dataset.
+What is the purpose of the `n_init` parameter in the `KMeans` class?,It specifies the number of times the algorithm will run with different initial centroid seeds to find the best result.
+"In the classification example, what percentage of the data was reserved for the test set?",$20\%$.
+What is the main benefit of using `SentenceTransformer` over standard word-level embeddings for intent recognition?,It produces a single vector that captures the meaning of the entire sequence or document.
+What is the result of applying `model.get_sentence_embedding_dimension()` to `all-MiniLM-L6-v2`?,The integer value $384$.
+Why is achieving high accuracy on a five-class problem with a very small dataset considered challenging?,Small datasets often lack enough examples for models to learn complex patterns without overfitting or missing class nuances.
+"In the DBSCAN implementation, what is the default behavior when `metric='cosine'` is used?",The algorithm measures similarity based on the angle between vectors rather than Euclidean distance.
+Which specific Scikit-learn metric is used to evaluate clustering when the ground-truth labels are unknown?,The Silhouette Score.
+Formula: F1-Score,"The harmonic mean of Precision and Recall, calculated as $2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$."
+What is the primary goal of document clustering in an unsupervised setting?,To identify common topics or groups among unclassified documents based on similarity.
+"When combining embeddings with structured data, what is the resulting feature vector called?",An engineered or combined feature vector.
+"In the provided visualization code, what do 'PC1' and 'PC2' stand for on the plot axes?",Principal Component 1 and Principal Component 2.
+What is the purpose of using `plt.colorbar()` in the clustering visualization plots?,To provide a visual reference for the mapping of cluster labels to colors.
+Which function is used to load the BBC News dataset from a URL in the tutorial?,`pd.read_csv()`.
+"In the Random Forest code, what does the `stratify=labels` argument prevent?",It prevents the total exclusion of any of the five classes from the training or test sets.

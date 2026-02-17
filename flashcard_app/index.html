@@ -1,0 +1,3060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flashcard Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+/* ============================================
+   CSS VARIABLES & RESET
+   ============================================ */
+:root {
+  --bg-deep: #1a0533;
+  --bg-midnight: #0a1628;
+  --cyan: #00f5ff;
+  --magenta: #ff00e5;
+  --cyan-dim: rgba(0, 245, 255, 0.3);
+  --magenta-dim: rgba(255, 0, 229, 0.3);
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg-hover: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-blur: 16px;
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-dim: rgba(255, 255, 255, 0.35);
+  --success: #00e676;
+  --warning: #ffab00;
+  --error: #ff5252;
+  --radius: 16px;
+  --radius-sm: 8px;
+  --radius-xs: 4px;
+  --shadow-cyan: 0 0 20px rgba(0, 245, 255, 0.3);
+  --shadow-magenta: 0 0 20px rgba(255, 0, 229, 0.3);
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font);
+  background: linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-midnight) 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.6;
+  font-weight: 300;
+}
+
+#particle-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ============================================
+   GLASS PANELS
+   ============================================ */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+}
+
+.glass:hover { background: var(--glass-bg-hover); }
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 60px;
+  background: rgba(10, 22, 40, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.nav-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--cyan), var(--magenta));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  cursor: pointer;
+}
+
+.nav-links {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+}
+
+.nav-links button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.nav-links button:hover { color: var(--text-primary); background: var(--glass-bg); }
+.nav-links button.active { color: var(--cyan); background: rgba(0, 245, 255, 0.1); }
+.nav-links button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.nav-deck-info {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* ============================================
+   MAIN CONTENT
+   ============================================ */
+main {
+  position: relative;
+  z-index: 1;
+  padding: 80px 24px 40px;
+  max-width: 900px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.view { display: none; animation: fadeSlideIn 0.4s ease; }
+.view.active { display: block; }
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================
+   LANDING VIEW
+   ============================================ */
+.landing-hero {
+  text-align: center;
+  padding: 60px 0 40px;
+}
+
+.landing-hero h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--cyan), var(--magenta));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.landing-hero p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.upload-zone {
+  margin: 30px auto;
+  max-width: 500px;
+  padding: 48px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 2px dashed var(--glass-border);
+  position: relative;
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--cyan);
+  box-shadow: var(--shadow-cyan);
+  background: rgba(0, 245, 255, 0.05);
+}
+
+.upload-zone .icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.upload-zone .label {
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.upload-zone .sublabel {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+#file-input { display: none; }
+
+.paste-section {
+  max-width: 500px;
+  margin: 24px auto;
+  text-align: center;
+}
+
+.paste-section summary {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.paste-area {
+  width: 100%;
+  min-height: 120px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  padding: 12px;
+  resize: vertical;
+}
+
+.paste-area:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: var(--shadow-cyan);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--cyan), #00c4cc);
+  color: #000;
+}
+
+.btn-primary:hover { box-shadow: var(--shadow-cyan); transform: translateY(-1px); }
+
+.btn-secondary {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+}
+
+.btn-secondary:hover { background: var(--glass-bg-hover); }
+
+.btn-danger {
+  background: rgba(255, 82, 82, 0.15);
+  color: var(--error);
+  border: 1px solid rgba(255, 82, 82, 0.3);
+}
+
+.btn-danger:hover { background: rgba(255, 82, 82, 0.25); }
+
+.btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+
+.recent-decks {
+  margin: 40px auto;
+  max-width: 500px;
+}
+
+.recent-decks h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+
+.deck-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.deck-item:hover { box-shadow: var(--shadow-cyan); }
+
+.deck-item-info h4 { font-size: 0.95rem; font-weight: 500; }
+.deck-item-info p { font-size: 0.75rem; color: var(--text-dim); }
+
+.deck-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.deck-item-actions button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px;
+  transition: var(--transition);
+}
+
+.deck-item-actions button:hover { color: var(--error); }
+
+/* ============================================
+   CLASSIC FLIP VIEW
+   ============================================ */
+.flip-container {
+  perspective: 1200px;
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.flip-card {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flip-card.flipped { transform: rotateY(180deg); }
+
+.flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  overflow-y: auto;
+}
+
+.flip-back { transform: rotateY(180deg); }
+
+.flip-face .card-label {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
+.flip-face .card-type-badge {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.badge-term { background: rgba(0, 245, 255, 0.15); color: var(--cyan); }
+.badge-concept { background: rgba(255, 0, 229, 0.15); color: var(--magenta); }
+.badge-formula { background: rgba(255, 171, 0, 0.15); color: var(--warning); }
+.badge-code { background: rgba(0, 230, 118, 0.15); color: var(--success); }
+
+.flip-face .card-content {
+  font-size: 1.2rem;
+  text-align: center;
+  line-height: 1.7;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.flip-face .card-content.formula-content {
+  font-size: 1.4rem;
+}
+
+.flip-face .card-content code {
+  background: rgba(0, 245, 255, 0.1);
+  border: 1px solid rgba(0, 245, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: var(--cyan);
+}
+
+.flip-face .card-content pre {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--glass-border);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-family: 'Courier New', monospace;
+  font-size: 0.85em;
+  text-align: left;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.card-hint {
+  position: absolute;
+  bottom: 16px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.flip-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 600px;
+  margin: 16px auto;
+  gap: 12px;
+}
+
+.flip-progress .counter {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--magenta));
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.rating-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  max-width: 600px;
+  margin: 20px auto 0;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: var(--transition);
+  pointer-events: none;
+}
+
+.rating-buttons.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.rating-btn {
+  padding: 10px 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  min-width: 80px;
+}
+
+.rating-btn:hover { transform: translateY(-2px); }
+.rating-btn.again { border-color: rgba(255, 82, 82, 0.4); }
+.rating-btn.again:hover { background: rgba(255, 82, 82, 0.15); box-shadow: 0 0 15px rgba(255,82,82,0.2); }
+.rating-btn.hard { border-color: rgba(255, 171, 0, 0.4); }
+.rating-btn.hard:hover { background: rgba(255, 171, 0, 0.15); box-shadow: 0 0 15px rgba(255,171,0,0.2); }
+.rating-btn.good { border-color: rgba(0, 245, 255, 0.4); }
+.rating-btn.good:hover { background: rgba(0, 245, 255, 0.15); box-shadow: var(--shadow-cyan); }
+.rating-btn.easy { border-color: rgba(0, 230, 118, 0.4); }
+.rating-btn.easy:hover { background: rgba(0, 230, 118, 0.15); box-shadow: 0 0 15px rgba(0,230,118,0.2); }
+
+.flip-nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  max-width: 600px;
+  margin: 16px auto 0;
+}
+
+.flip-nav button { min-width: 100px; }
+
+/* ============================================
+   QUIZ MODE
+   ============================================ */
+.quiz-card {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 40px 32px;
+}
+
+.quiz-question {
+  font-size: 1.15rem;
+  text-align: center;
+  margin-bottom: 28px;
+  line-height: 1.7;
+}
+
+.quiz-input-wrap {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.quiz-input {
+  width: 100%;
+  padding: 14px 18px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.quiz-input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: var(--shadow-cyan);
+}
+
+.quiz-submit { width: 100%; margin-top: 8px; }
+
+.quiz-feedback {
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: var(--radius-sm);
+  display: none;
+}
+
+.quiz-feedback.correct {
+  display: block;
+  background: rgba(0, 230, 118, 0.1);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.quiz-feedback.partial {
+  display: block;
+  background: rgba(255, 171, 0, 0.1);
+  border: 1px solid rgba(255, 171, 0, 0.3);
+}
+
+.quiz-feedback.incorrect {
+  display: block;
+  background: rgba(255, 82, 82, 0.1);
+  border: 1px solid rgba(255, 82, 82, 0.3);
+}
+
+.quiz-feedback .score-line {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.quiz-feedback .answer-display {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.quiz-feedback .answer-display .kw-match {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.quiz-feedback .answer-display .kw-miss {
+  color: var(--error);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.quiz-score-bar {
+  max-width: 600px;
+  margin: 12px auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quiz-score-bar .score-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ============================================
+   MATCH GAME
+   ============================================ */
+.match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 700px;
+  margin: 0 auto 20px;
+}
+
+.match-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.match-stat {
+  text-align: center;
+}
+
+.match-stat .val {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+.match-stat .lbl {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.match-grid {
+  display: grid;
+  gap: 10px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.match-grid.grid-4x3 { grid-template-columns: repeat(4, 1fr); }
+.match-grid.grid-4x4 { grid-template-columns: repeat(4, 1fr); }
+
+.match-tile {
+  aspect-ratio: 1.3;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  text-align: center;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  user-select: none;
+}
+
+.match-tile:hover { background: var(--glass-bg-hover); }
+
+.match-tile.face-down {
+  background: linear-gradient(135deg, rgba(0,245,255,0.08), rgba(255,0,229,0.08));
+}
+
+.match-tile.face-down .tile-content { visibility: hidden; }
+
+.match-tile.selected {
+  border-color: var(--cyan);
+  box-shadow: var(--shadow-cyan);
+  background: rgba(0, 245, 255, 0.1);
+}
+
+.match-tile.matched {
+  border-color: var(--success);
+  background: rgba(0, 230, 118, 0.1);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.match-tile.wrong {
+  border-color: var(--error);
+  background: rgba(255, 82, 82, 0.15);
+  animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.tile-label {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+.match-continue-btn {
+  display: block;
+  margin: 16px auto 0;
+  min-width: 160px;
+  animation: fadeSlideIn 0.2s ease;
+}
+
+.match-complete {
+  text-align: center;
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 40px;
+}
+
+.match-complete h2 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, var(--cyan), var(--magenta));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.match-complete .stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+/* ============================================
+   SPEED ROUND
+   ============================================ */
+.speed-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.speed-timer {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--cyan);
+  font-variant-numeric: tabular-nums;
+}
+
+.speed-timer.warning { color: var(--warning); }
+.speed-timer.danger { color: var(--error); }
+
+.speed-card {
+  max-width: 600px;
+  margin: 0 auto 24px;
+  padding: 48px 32px;
+  text-align: center;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: pan-y;
+  position: relative;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.speed-card.swipe-left {
+  transform: translateX(-120px) rotate(-8deg);
+  opacity: 0;
+}
+
+.speed-card.swipe-right {
+  transform: translateX(120px) rotate(8deg);
+  opacity: 0;
+}
+
+.speed-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.speed-btn {
+  padding: 14px 36px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 2px solid;
+  background: var(--glass-bg);
+  min-width: 140px;
+}
+
+.speed-btn.know {
+  border-color: rgba(0, 230, 118, 0.4);
+  color: var(--success);
+}
+.speed-btn.know:hover { background: rgba(0, 230, 118, 0.15); }
+
+.speed-btn.dont-know {
+  border-color: rgba(255, 82, 82, 0.4);
+  color: var(--error);
+}
+.speed-btn.dont-know:hover { background: rgba(255, 82, 82, 0.15); }
+
+.speed-setup {
+  text-align: center;
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 32px;
+}
+
+.speed-time-options {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.speed-time-btn {
+  padding: 10px 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.speed-time-btn.active {
+  border-color: var(--cyan);
+  background: rgba(0, 245, 255, 0.1);
+  color: var(--cyan);
+}
+
+.speed-results {
+  text-align: center;
+  max-width: 500px;
+  margin: 40px auto;
+  padding: 40px;
+}
+
+.speed-results h2 {
+  font-size: 1.5rem;
+  margin-bottom: 24px;
+}
+
+.speed-results .big-score {
+  font-size: 3rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--cyan), var(--magenta));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+/* ============================================
+   DASHBOARD
+   ============================================ */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.dash-card {
+  padding: 24px;
+  text-align: center;
+}
+
+.dash-card .dash-value {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.dash-card .dash-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dash-value.cyan { color: var(--cyan); }
+.dash-value.magenta { color: var(--magenta); }
+.dash-value.success { color: var(--success); }
+.dash-value.warning { color: var(--warning); }
+
+.svg-ring-container {
+  padding: 32px;
+  margin-bottom: 24px;
+}
+
+.svg-ring-container h3 {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--text-secondary);
+}
+
+.rings-row {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.ring-item { text-align: center; }
+
+.ring-item svg { width: 100px; height: 100px; }
+
+.ring-track { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 8; }
+.ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+
+.ring-center {
+  font-size: 1.3rem;
+  font-weight: 700;
+  fill: var(--text-primary);
+  dominant-baseline: central;
+  text-anchor: middle;
+}
+
+.ring-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.heatmap-container {
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.heatmap-container h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+  gap: 4px;
+}
+
+.heat-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  position: relative;
+  cursor: default;
+}
+
+.heat-cell[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.9);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.heat-0 { background: rgba(255,255,255,0.04); }
+.heat-1 { background: rgba(0, 245, 255, 0.15); }
+.heat-2 { background: rgba(0, 245, 255, 0.3); }
+.heat-3 { background: rgba(0, 245, 255, 0.5); }
+.heat-4 { background: rgba(0, 230, 118, 0.4); }
+.heat-5 { background: rgba(0, 230, 118, 0.7); }
+
+/* ============================================
+   DECK MANAGEMENT
+   ============================================ */
+.deck-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.deck-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 16px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.9rem;
+}
+
+.deck-search:focus {
+  outline: none;
+  border-color: var(--cyan);
+}
+
+.filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.chip.active {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(0, 245, 255, 0.1);
+}
+
+.chip:hover { background: var(--glass-bg-hover); }
+
+.deck-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.card-list { display: flex; flex-direction: column; gap: 8px; }
+
+.card-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  transition: var(--transition);
+  cursor: default;
+}
+
+.card-list-item:hover { background: var(--glass-bg-hover); }
+
+.card-list-item .card-q {
+  flex: 1;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-list-item .card-mastery {
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+}
+
+.card-list-item .card-star {
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: var(--transition);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  padding: 2px;
+}
+
+.card-list-item .card-star.starred { color: var(--warning); }
+
+.mastery-low { color: var(--error); }
+.mastery-mid { color: var(--warning); }
+.mastery-high { color: var(--success); }
+
+.deck-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+}
+
+/* ============================================
+   SETTINGS MODAL
+   ============================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+  max-width: 420px;
+  width: 100%;
+  padding: 32px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal h2 {
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+}
+
+.modal-field {
+  margin-bottom: 16px;
+}
+
+.modal-field label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.modal-field select, .modal-field input[type="number"] {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.9rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+/* ============================================
+   TOAST NOTIFICATIONS
+   ============================================ */
+.toast-container {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid;
+  max-width: 320px;
+}
+
+.toast.info { background: rgba(0,245,255,0.15); border-color: rgba(0,245,255,0.3); color: var(--cyan); }
+.toast.success { background: rgba(0,230,118,0.15); border-color: rgba(0,230,118,0.3); color: var(--success); }
+.toast.error { background: rgba(255,82,82,0.15); border-color: rgba(255,82,82,0.3); color: var(--error); }
+
+@keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(40px); } }
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .hamburger { display: block; }
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 60px; left: 0; right: 0;
+    flex-direction: column;
+    background: rgba(10, 22, 40, 0.95);
+    backdrop-filter: blur(20px);
+    padding: 12px;
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .nav-links.open { display: flex; }
+  .nav-deck-info { display: none; }
+  .landing-hero h1 { font-size: 1.8rem; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .rings-row { gap: 20px; }
+  .match-grid.grid-4x3, .match-grid.grid-4x4 { grid-template-columns: repeat(3, 1fr); }
+  .speed-buttons { gap: 12px; }
+  .speed-btn { min-width: 110px; padding: 12px 20px; }
+  .flip-face { padding: 32px 20px; }
+  main { padding: 70px 16px 30px; }
+}
+
+@media (max-width: 480px) {
+  .rating-buttons { flex-wrap: wrap; }
+  .rating-btn { min-width: 70px; padding: 8px 12px; font-size: 0.8rem; }
+  .match-grid.grid-4x3, .match-grid.grid-4x4 { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .match-tile { font-size: 0.7rem; padding: 6px; }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .flip-card { transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="particle-canvas" aria-hidden="true"></canvas>
+
+<!-- Navigation -->
+<nav role="navigation" aria-label="Main navigation">
+  <span class="nav-brand" tabindex="0" role="button" aria-label="Go to home" id="nav-home">Flashcard Studio</span>
+  <button class="hamburger" aria-label="Toggle menu" id="hamburger">&#9776;</button>
+  <ul class="nav-links" id="nav-links" role="menubar">
+    <li><button role="menuitem" data-view="landing">Home</button></li>
+    <li><button role="menuitem" data-view="classic" disabled>Classic Flip</button></li>
+    <li><button role="menuitem" data-view="quiz" disabled>Quiz</button></li>
+    <li><button role="menuitem" data-view="match" disabled>Match</button></li>
+    <li><button role="menuitem" data-view="speed" disabled>Speed</button></li>
+    <li><button role="menuitem" data-view="dashboard" disabled>Dashboard</button></li>
+    <li><button role="menuitem" data-view="manage" disabled>Deck</button></li>
+  </ul>
+  <span class="nav-deck-info" id="nav-deck-info"></span>
+</nav>
+
+<main>
+  <!-- ============ LANDING VIEW ============ -->
+  <section class="view active" id="view-landing" role="region" aria-label="Upload flashcards">
+    <div class="landing-hero">
+      <h1>Flashcard Studio</h1>
+      <p>Upload a CSV to start studying. Spaced repetition, quizzes, and more.</p>
+    </div>
+
+    <div class="upload-zone glass" id="upload-zone" tabindex="0" role="button" aria-label="Click or drag to upload CSV file">
+      <span class="icon" aria-hidden="true">&#128196;</span>
+      <span class="label">Drop CSV here or click to upload</span>
+      <span class="sublabel">Format: question,answer per line (no header)</span>
+      <input type="file" id="file-input" accept=".csv,.txt">
+    </div>
+
+    <div class="paste-section">
+      <details>
+        <summary>Or paste CSV text</summary>
+        <textarea class="paste-area" id="paste-area" placeholder="question,answer&#10;What is 2+2?,4&#10;Capital of France?,Paris" rows="5" aria-label="Paste CSV content"></textarea>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px" id="paste-btn">Load Pasted Data</button>
+      </details>
+    </div>
+
+    <div class="recent-decks" id="recent-decks"></div>
+  </section>
+
+  <!-- ============ CLASSIC FLIP VIEW ============ -->
+  <section class="view" id="view-classic" role="region" aria-label="Classic flip mode">
+    <div class="flip-progress">
+      <span class="counter" id="flip-counter">1 / 10</span>
+      <div class="progress-bar"><div class="progress-fill" id="flip-progress-fill" style="width:0%"></div></div>
+      <span class="counter" id="flip-due-count"></span>
+    </div>
+
+    <div class="flip-container">
+      <div class="flip-card" id="flip-card" tabindex="0" role="button" aria-label="Click to flip card">
+        <div class="flip-face flip-front" id="flip-front">
+          <span class="card-label">Question</span>
+          <span class="card-type-badge" id="flip-type-badge"></span>
+          <div class="card-content" id="flip-question"></div>
+          <span class="card-hint">Click or press Space to flip</span>
+        </div>
+        <div class="flip-face flip-back" id="flip-back">
+          <span class="card-label">Answer</span>
+          <div class="card-content" id="flip-answer"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rating-buttons" id="rating-buttons" aria-label="Rate your recall">
+      <button class="rating-btn again" data-rating="0" aria-label="Again - did not remember">Again</button>
+      <button class="rating-btn hard" data-rating="3" aria-label="Hard - barely remembered">Hard</button>
+      <button class="rating-btn good" data-rating="4" aria-label="Good - remembered with effort">Good</button>
+      <button class="rating-btn easy" data-rating="5" aria-label="Easy - immediately remembered">Easy</button>
+    </div>
+
+    <div class="flip-nav">
+      <button class="btn btn-secondary btn-sm" id="flip-prev" aria-label="Previous card">&#8592; Prev</button>
+      <button class="btn btn-secondary btn-sm" id="flip-skip" aria-label="Skip card">Skip &#8594;</button>
+    </div>
+  </section>
+
+  <!-- ============ QUIZ VIEW ============ -->
+  <section class="view" id="view-quiz" role="region" aria-label="Quiz mode">
+    <div class="quiz-score-bar">
+      <span class="score-text" id="quiz-score-text">Score: 0 / 0</span>
+      <div class="progress-bar"><div class="progress-fill" id="quiz-progress-fill" style="width:0%"></div></div>
+      <span class="score-text" id="quiz-counter">1 / 10</span>
+    </div>
+
+    <div class="quiz-card glass" id="quiz-card">
+      <div class="quiz-question" id="quiz-question"></div>
+      <div class="quiz-input-wrap">
+        <input type="text" class="quiz-input" id="quiz-input" placeholder="Type your answer..." autocomplete="off" aria-label="Your answer">
+      </div>
+      <button class="btn btn-primary quiz-submit" id="quiz-submit">Check Answer</button>
+      <div class="quiz-feedback" id="quiz-feedback">
+        <div class="score-line" id="quiz-feedback-score"></div>
+        <div class="answer-display" id="quiz-feedback-answer"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:14px" id="quiz-next">Next Question &#8594;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MATCH VIEW ============ -->
+  <section class="view" id="view-match" role="region" aria-label="Match game">
+    <div class="match-header">
+      <div class="match-stats">
+        <div class="match-stat"><div class="val" id="match-moves">0</div><div class="lbl">Moves</div></div>
+        <div class="match-stat"><div class="val" id="match-timer">0:00</div><div class="lbl">Time</div></div>
+        <div class="match-stat"><div class="val" id="match-pairs-left">6</div><div class="lbl">Pairs Left</div></div>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="match-restart">New Game</button>
+    </div>
+    <div class="match-grid" id="match-grid" role="grid" aria-label="Match pairs grid"></div>
+    <div class="match-complete glass" id="match-complete" style="display:none"></div>
+  </section>
+
+  <!-- ============ SPEED VIEW ============ -->
+  <section class="view" id="view-speed" role="region" aria-label="Speed round">
+    <div id="speed-setup-screen">
+      <div class="speed-setup glass">
+        <h2>Speed Round</h2>
+        <p style="color:var(--text-secondary);margin-bottom:16px">How long do you want?</p>
+        <div class="speed-time-options" id="speed-time-options">
+          <button class="speed-time-btn" data-time="30">30s</button>
+          <button class="speed-time-btn active" data-time="60">60s</button>
+          <button class="speed-time-btn" data-time="120">2min</button>
+        </div>
+        <button class="btn btn-primary" id="speed-start" style="margin-top:20px">Start</button>
+      </div>
+    </div>
+
+    <div id="speed-play-screen" style="display:none">
+      <div class="speed-header">
+        <div class="speed-timer" id="speed-timer">60</div>
+      </div>
+      <div class="speed-card glass" id="speed-card">
+        <div class="card-content" id="speed-question"></div>
+      </div>
+      <div class="speed-buttons">
+        <button class="speed-btn dont-know" id="speed-dont-know" aria-label="Don't know">&#10007; Don't Know</button>
+        <button class="speed-btn know" id="speed-know" aria-label="Know it">&#10003; Know It</button>
+      </div>
+      <div class="flip-progress" style="margin-top:20px">
+        <span class="counter" id="speed-counter">0 cards</span>
+        <div class="progress-bar"><div class="progress-fill" id="speed-progress" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div id="speed-results-screen" style="display:none">
+      <div class="speed-results glass">
+        <h2>Speed Round Complete!</h2>
+        <div class="big-score" id="speed-result-score">0%</div>
+        <p style="color:var(--text-secondary)" id="speed-result-detail"></p>
+        <div class="dashboard-grid" style="margin-top:20px" id="speed-result-stats"></div>
+        <button class="btn btn-primary" id="speed-again" style="margin-top:20px">Play Again</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DASHBOARD VIEW ============ -->
+  <section class="view" id="view-dashboard" role="region" aria-label="Study dashboard">
+    <h2 style="font-size:1.3rem;margin-bottom:20px">Dashboard</h2>
+
+    <div class="dashboard-grid" id="dash-stats"></div>
+
+    <div class="svg-ring-container glass" id="dash-rings"></div>
+
+    <div class="heatmap-container glass" id="dash-heatmap"></div>
+
+    <div style="text-align:center;margin-top:16px">
+      <button class="btn btn-danger btn-sm" id="dash-reset">Reset All Progress</button>
+    </div>
+  </section>
+
+  <!-- ============ DECK MANAGEMENT VIEW ============ -->
+  <section class="view" id="view-manage" role="region" aria-label="Deck management">
+    <h2 style="font-size:1.3rem;margin-bottom:16px">Deck Management</h2>
+
+    <div class="deck-controls">
+      <input type="text" class="deck-search" id="deck-search" placeholder="Search cards..." aria-label="Search cards">
+      <div class="filter-chips" id="filter-chips">
+        <span class="chip active" data-filter="all">All</span>
+        <span class="chip" data-filter="term">Term</span>
+        <span class="chip" data-filter="concept">Concept</span>
+        <span class="chip" data-filter="formula">Formula</span>
+        <span class="chip" data-filter="code">Code</span>
+      </div>
+    </div>
+
+    <div class="deck-actions">
+      <button class="btn btn-secondary btn-sm" id="deck-shuffle">&#x1f500; Shuffle</button>
+      <button class="btn btn-secondary btn-sm" id="deck-missed">&#x274c; Missed Only</button>
+      <button class="btn btn-secondary btn-sm" id="deck-starred">&#x2b50; Starred</button>
+      <button class="btn btn-secondary btn-sm" id="deck-due">&#x23f0; Due Cards</button>
+    </div>
+
+    <div class="card-list" id="card-list"></div>
+    <div class="deck-empty" id="deck-empty" style="display:none">No cards match your filters.</div>
+  </section>
+</main>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal glass" role="dialog" aria-label="Settings">
+    <h2>Settings</h2>
+    <div class="modal-field">
+      <label>Cards per session (Classic Flip)</label>
+      <input type="number" id="setting-session-size" min="5" max="100" value="20">
+    </div>
+    <div class="modal-field">
+      <label>Speed round default time</label>
+      <select id="setting-speed-time">
+        <option value="30">30 seconds</option>
+        <option value="60" selected>60 seconds</option>
+        <option value="120">2 minutes</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Match game grid</label>
+      <select id="setting-match-grid">
+        <option value="12" selected>4x3 (6 pairs)</option>
+        <option value="16">4x4 (8 pairs)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-sm" id="settings-close">Close</button>
+      <button class="btn btn-primary btn-sm" id="settings-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   CSVParser — State-machine CSV parser
+   ============================================================ */
+class CSVParser {
+  static parse(text) {
+    const cards = [];
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const fields = CSVParser._parseLine(trimmed);
+      if (fields.length >= 2 && fields[0] && fields[1]) {
+        cards.push({ question: fields[0].trim(), answer: fields[1].trim() });
+      }
+    }
+    return cards;
+  }
+
+  static _parseLine(line) {
+    const fields = [];
+    let current = '';
+    let inQuotes = false;
+    let i = 0;
+    while (i < line.length) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') {
+            current += '"';
+            i += 2;
+          } else {
+            inQuotes = false;
+            i++;
+          }
+        } else {
+          current += ch;
+          i++;
+        }
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+          i++;
+        } else if (ch === ',') {
+          fields.push(current);
+          current = '';
+          i++;
+        } else {
+          current += ch;
+          i++;
+        }
+      }
+    }
+    fields.push(current);
+    return fields;
+  }
+
+  static hashContent(text) {
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      const chr = text.charCodeAt(i);
+      hash = ((hash << 5) - hash) + chr;
+      hash |= 0;
+    }
+    return 'deck_' + Math.abs(hash).toString(36);
+  }
+}
+
+/* ============================================================
+   StateManager — localStorage CRUD
+   ============================================================ */
+class StateManager {
+  constructor() {
+    this.deckHash = null;
+    this.deckName = '';
+  }
+
+  setDeck(hash, name) {
+    this.deckHash = hash;
+    this.deckName = name;
+  }
+
+  _key(suffix) { return `flashcards_${this.deckHash}_${suffix}`; }
+
+  getCardState(index) {
+    const raw = localStorage.getItem(this._key(`card_${index}`));
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  setCardState(index, state) {
+    localStorage.setItem(this._key(`card_${index}`), JSON.stringify(state));
+  }
+
+  getGlobal(key, fallback = null) {
+    const raw = localStorage.getItem(`flashcards_global_${key}`);
+    if (raw === null) return fallback;
+    try { return JSON.parse(raw); } catch { return fallback; }
+  }
+
+  setGlobal(key, value) {
+    localStorage.setItem(`flashcards_global_${key}`, JSON.stringify(value));
+  }
+
+  getSettings() {
+    return this.getGlobal('settings', { sessionSize: 20, speedTime: 60, matchGrid: 12 });
+  }
+
+  saveSettings(s) { this.setGlobal('settings', s); }
+
+  getStreak() { return this.getGlobal('streak', { current: 0, best: 0, lastDate: null }); }
+
+  updateStreak() {
+    const streak = this.getStreak();
+    const today = new Date().toISOString().split('T')[0];
+    if (streak.lastDate === today) return streak;
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    if (streak.lastDate === yesterday) {
+      streak.current++;
+    } else if (streak.lastDate !== today) {
+      streak.current = 1;
+    }
+    streak.best = Math.max(streak.best, streak.current);
+    streak.lastDate = today;
+    this.setGlobal('streak', streak);
+    return streak;
+  }
+
+  getBookmarks() {
+    const raw = localStorage.getItem(this._key('bookmarks'));
+    if (!raw) return new Set();
+    try { return new Set(JSON.parse(raw)); } catch { return new Set(); }
+  }
+
+  toggleBookmark(index) {
+    const bm = this.getBookmarks();
+    if (bm.has(index)) bm.delete(index); else bm.add(index);
+    localStorage.setItem(this._key('bookmarks'), JSON.stringify([...bm]));
+    return bm.has(index);
+  }
+
+  getSavedDecks() { return this.getGlobal('savedDecks', []); }
+
+  saveDeckMeta(hash, name, count) {
+    const decks = this.getSavedDecks();
+    const existing = decks.findIndex(d => d.hash === hash);
+    const meta = { hash, name, count, lastUsed: Date.now() };
+    if (existing >= 0) decks[existing] = meta; else decks.push(meta);
+    this.setGlobal('savedDecks', decks);
+  }
+
+  removeDeck(hash) {
+    let decks = this.getSavedDecks().filter(d => d.hash !== hash);
+    this.setGlobal('savedDecks', decks);
+    // Clear card states
+    const prefix = `flashcards_${hash}_`;
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) toRemove.push(key);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  }
+
+  resetDeckProgress() {
+    if (!this.deckHash) return;
+    const prefix = `flashcards_${this.deckHash}_card_`;
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) toRemove.push(key);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem(this._key('bookmarks'));
+  }
+}
+
+/* ============================================================
+   SpacedRepetition — SM-2 algorithm
+   ============================================================ */
+class SpacedRepetition {
+  constructor(stateManager) {
+    this.sm = stateManager;
+  }
+
+  defaultState() {
+    return {
+      easiness: 2.5,
+      interval: 0,
+      repetitions: 0,
+      nextReview: Date.now(),
+      correctCount: 0,
+      totalReviews: 0,
+      lastRating: null,
+      mastery: 0
+    };
+  }
+
+  getState(index) {
+    return this.sm.getCardState(index) || this.defaultState();
+  }
+
+  review(index, quality) {
+    // quality: 0=again, 3=hard, 4=good, 5=easy
+    const s = this.getState(index);
+    s.totalReviews++;
+    if (quality >= 3) s.correctCount++;
+    s.lastRating = quality;
+
+    if (quality < 3) {
+      s.repetitions = 0;
+      s.interval = 1;
+    } else {
+      if (s.repetitions === 0) {
+        s.interval = 1;
+      } else if (s.repetitions === 1) {
+        s.interval = 6;
+      } else {
+        s.interval = Math.round(s.interval * s.easiness);
+      }
+      s.repetitions++;
+    }
+
+    s.easiness = Math.max(1.3, s.easiness + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    s.nextReview = Date.now() + s.interval * 86400000;
+
+    // Mastery: blend of correctness ratio and repetition depth
+    const accuracy = s.totalReviews > 0 ? s.correctCount / s.totalReviews : 0;
+    const repFactor = Math.min(1, s.repetitions / 5);
+    s.mastery = Math.round((accuracy * 0.6 + repFactor * 0.4) * 100);
+
+    this.sm.setCardState(index, s);
+    return s;
+  }
+
+  isDue(index) {
+    const s = this.getState(index);
+    return s.nextReview <= Date.now();
+  }
+
+  getDueCards(totalCards) {
+    const due = [];
+    for (let i = 0; i < totalCards; i++) {
+      if (this.isDue(i)) due.push(i);
+    }
+    return due;
+  }
+
+  getSessionQueue(totalCards, sessionSize) {
+    const due = this.getDueCards(totalCards);
+    // New cards: never reviewed
+    const newCards = [];
+    const reviewCards = [];
+    for (const i of due) {
+      const s = this.getState(i);
+      if (s.totalReviews === 0) newCards.push(i); else reviewCards.push(i);
+    }
+    // Prioritize review cards, then new cards
+    const queue = [...reviewCards, ...newCards];
+    return queue.slice(0, sessionSize);
+  }
+
+  getStats(totalCards) {
+    let newCount = 0, learning = 0, mastered = 0;
+    let totalAccuracy = 0, reviewed = 0;
+    for (let i = 0; i < totalCards; i++) {
+      const s = this.getState(i);
+      if (s.totalReviews === 0) {
+        newCount++;
+      } else if (s.mastery >= 80) {
+        mastered++;
+      } else {
+        learning++;
+      }
+      if (s.totalReviews > 0) {
+        totalAccuracy += s.correctCount / s.totalReviews;
+        reviewed++;
+      }
+    }
+    return {
+      newCount, learning, mastered, total: totalCards,
+      accuracy: reviewed > 0 ? Math.round((totalAccuracy / reviewed) * 100) : 0,
+      due: this.getDueCards(totalCards).length
+    };
+  }
+}
+
+/* ============================================================
+   CardRenderer — KaTeX + code + type detection
+   ============================================================ */
+class CardRenderer {
+  static detectType(question, answer) {
+    const combined = question + ' ' + answer;
+    if (/\$[^$]+\$/.test(combined) || /\\frac|\\int|\\sum|\\sqrt|\\alpha|\\beta/.test(combined)) return 'formula';
+    if (/`[^`]+`/.test(combined) || /function |const |var |let |class |def |import /.test(combined)) return 'code';
+    if (answer.length > 100 || /because|therefore|process|explain|describe/i.test(question)) return 'concept';
+    return 'term';
+  }
+
+  static render(text, isFormula) {
+    // Replace backtick code blocks first
+    let html = text.replace(/```([\s\S]*?)```/g, (_, code) =>
+      `<pre>${CardRenderer._escapeHtml(code.trim())}</pre>`
+    );
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, (_, code) =>
+      `<code>${CardRenderer._escapeHtml(code)}</code>`
+    );
+    // Newlines to <br>
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  }
+
+  static renderToElement(el, text, type) {
+    const isFormula = type === 'formula';
+    el.innerHTML = CardRenderer.render(text, isFormula);
+    if (isFormula) el.classList.add('formula-content');
+    else el.classList.remove('formula-content');
+
+    // KaTeX rendering
+    if (typeof renderMathInElement === 'function') {
+      try {
+        renderMathInElement(el, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false }
+          ],
+          throwOnError: false
+        });
+      } catch (e) { /* ignore KaTeX errors */ }
+    }
+  }
+
+  static getBadgeClass(type) {
+    return { term: 'badge-term', concept: 'badge-concept', formula: 'badge-formula', code: 'badge-code' }[type] || 'badge-term';
+  }
+
+  static _escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+}
+
+/* ============================================================
+   UIController — View switching, toasts, nav
+   ============================================================ */
+class UIController {
+  constructor() {
+    this.currentView = 'landing';
+    this.deckLoaded = false;
+    this._initNav();
+  }
+
+  _initNav() {
+    document.querySelectorAll('[data-view]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!btn.disabled) this.showView(btn.dataset.view);
+        document.getElementById('nav-links').classList.remove('open');
+      });
+    });
+    document.getElementById('nav-home').addEventListener('click', () => this.showView('landing'));
+    document.getElementById('hamburger').addEventListener('click', () => {
+      document.getElementById('nav-links').classList.toggle('open');
+    });
+  }
+
+  showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const el = document.getElementById(`view-${name}`);
+    if (el) el.classList.add('active');
+    this.currentView = name;
+    document.querySelectorAll('[data-view]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.view === name);
+    });
+    document.getElementById('nav-links').classList.remove('open');
+    // Fire custom event
+    window.dispatchEvent(new CustomEvent('viewchange', { detail: { view: name } }));
+  }
+
+  enableModes() {
+    this.deckLoaded = true;
+    document.querySelectorAll('[data-view]').forEach(btn => {
+      btn.disabled = false;
+    });
+  }
+
+  setDeckInfo(text) {
+    document.getElementById('nav-deck-info').textContent = text;
+  }
+
+  static toast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    toast.setAttribute('role', 'alert');
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3100);
+  }
+}
+
+/* ============================================================
+   ClassicFlipMode
+   ============================================================ */
+class ClassicFlipMode {
+  constructor(app) {
+    this.app = app;
+    this.queue = [];
+    this.currentIndex = 0;
+    this.isFlipped = false;
+    this._initEvents();
+  }
+
+  _initEvents() {
+    const card = document.getElementById('flip-card');
+    card.addEventListener('click', () => this.flip());
+    card.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); this.flip(); } });
+
+    document.querySelectorAll('.rating-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.rate(parseInt(btn.dataset.rating)));
+    });
+
+    document.getElementById('flip-prev').addEventListener('click', () => this.prev());
+    document.getElementById('flip-skip').addEventListener('click', () => this.next(false));
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      if (this.app.ui.currentView !== 'classic') return;
+      if (e.key === ' ' && !e.target.matches('input,textarea')) { e.preventDefault(); this.flip(); }
+      if (e.key === '1') this.rate(0);
+      if (e.key === '2') this.rate(3);
+      if (e.key === '3') this.rate(4);
+      if (e.key === '4') this.rate(5);
+      if (e.key === 'ArrowRight') this.next(false);
+      if (e.key === 'ArrowLeft') this.prev();
+    });
+  }
+
+  start(queue) {
+    this.queue = queue.length > 0 ? queue : [...Array(this.app.cards.length).keys()];
+    this.currentIndex = 0;
+    this.renderCard();
+  }
+
+  renderCard() {
+    if (this.queue.length === 0) return;
+    const idx = this.queue[this.currentIndex];
+    const card = this.app.cards[idx];
+    const type = CardRenderer.detectType(card.question, card.answer);
+
+    // Reset flip
+    this.isFlipped = false;
+    document.getElementById('flip-card').classList.remove('flipped');
+    document.getElementById('rating-buttons').classList.remove('visible');
+
+    // Render content
+    const qEl = document.getElementById('flip-question');
+    const aEl = document.getElementById('flip-answer');
+    CardRenderer.renderToElement(qEl, card.question, type);
+    CardRenderer.renderToElement(aEl, card.answer, type);
+
+    // Badge
+    const badge = document.getElementById('flip-type-badge');
+    badge.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+    badge.className = 'card-type-badge ' + CardRenderer.getBadgeClass(type);
+
+    // Progress
+    document.getElementById('flip-counter').textContent = `${this.currentIndex + 1} / ${this.queue.length}`;
+    document.getElementById('flip-progress-fill').style.width = `${((this.currentIndex + 1) / this.queue.length) * 100}%`;
+    const dueCount = this.app.sr.getDueCards(this.app.cards.length).length;
+    document.getElementById('flip-due-count').textContent = `${dueCount} due`;
+  }
+
+  flip() {
+    this.isFlipped = !this.isFlipped;
+    document.getElementById('flip-card').classList.toggle('flipped', this.isFlipped);
+    document.getElementById('rating-buttons').classList.toggle('visible', this.isFlipped);
+  }
+
+  rate(quality) {
+    if (!this.isFlipped) return;
+    const idx = this.queue[this.currentIndex];
+    this.app.sr.review(idx, quality);
+    this.app.state.updateStreak();
+    this.next(true);
+  }
+
+  next(rated) {
+    if (this.currentIndex < this.queue.length - 1) {
+      this.currentIndex++;
+      this.renderCard();
+    } else {
+      UIController.toast('Session complete! All cards reviewed.', 'success');
+      if (rated) this.app.ui.showView('dashboard');
+    }
+  }
+
+  prev() {
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+      this.renderCard();
+    }
+  }
+}
+
+/* ============================================================
+   QuizMode
+   ============================================================ */
+class QuizMode {
+  constructor(app) {
+    this.app = app;
+    this.queue = [];
+    this.currentIndex = 0;
+    this.score = 0;
+    this.answered = false;
+    this._initEvents();
+  }
+
+  _initEvents() {
+    document.getElementById('quiz-submit').addEventListener('click', () => this.checkAnswer());
+    document.getElementById('quiz-next').addEventListener('click', () => this.nextQuestion());
+    document.getElementById('quiz-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        if (this.answered) this.nextQuestion();
+        else this.checkAnswer();
+      }
+    });
+  }
+
+  start(queue) {
+    this.queue = queue.length > 0 ? queue : this._shuffled();
+    this.currentIndex = 0;
+    this.score = 0;
+    this.answered = false;
+    this.renderQuestion();
+  }
+
+  _shuffled() {
+    const arr = [...Array(this.app.cards.length).keys()];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  renderQuestion() {
+    if (this.currentIndex >= this.queue.length) {
+      this._showFinalScore();
+      return;
+    }
+    const idx = this.queue[this.currentIndex];
+    const card = this.app.cards[idx];
+    const type = CardRenderer.detectType(card.question, card.answer);
+
+    const qEl = document.getElementById('quiz-question');
+    CardRenderer.renderToElement(qEl, card.question, type);
+
+    document.getElementById('quiz-input').value = '';
+    document.getElementById('quiz-input').focus();
+    document.getElementById('quiz-feedback').className = 'quiz-feedback';
+    document.getElementById('quiz-feedback').style.display = 'none';
+    document.getElementById('quiz-submit').style.display = '';
+    this.answered = false;
+
+    document.getElementById('quiz-counter').textContent = `${this.currentIndex + 1} / ${this.queue.length}`;
+    document.getElementById('quiz-score-text').textContent = `Score: ${this.score} / ${this.currentIndex}`;
+    document.getElementById('quiz-progress-fill').style.width = `${((this.currentIndex) / this.queue.length) * 100}%`;
+  }
+
+  checkAnswer() {
+    if (this.answered) return;
+    this.answered = true;
+
+    const idx = this.queue[this.currentIndex];
+    const card = this.app.cards[idx];
+    const userAnswer = document.getElementById('quiz-input').value.trim();
+    const result = this._evaluateAnswer(userAnswer, card.answer);
+
+    // Update spaced repetition
+    const quality = result.score >= 0.8 ? 5 : result.score >= 0.5 ? 3 : 0;
+    this.app.sr.review(idx, quality);
+    if (result.score >= 0.5) this.score++;
+
+    // Feedback display
+    const fb = document.getElementById('quiz-feedback');
+    fb.style.display = 'block';
+    if (result.score >= 0.8) fb.className = 'quiz-feedback correct';
+    else if (result.score >= 0.4) fb.className = 'quiz-feedback partial';
+    else fb.className = 'quiz-feedback incorrect';
+
+    const scorePercent = Math.round(result.score * 100);
+    const emoji = result.score >= 0.8 ? '&#10003;' : result.score >= 0.4 ? '~' : '&#10007;';
+    document.getElementById('quiz-feedback-score').innerHTML = `${emoji} ${scorePercent}% Match`;
+    document.getElementById('quiz-feedback-answer').innerHTML = `<strong>Answer:</strong> ${result.highlightedAnswer}`;
+    document.getElementById('quiz-submit').style.display = 'none';
+  }
+
+  _evaluateAnswer(userAnswer, correctAnswer) {
+    // Strip math/code notation for comparison
+    const clean = (s) => s.replace(/\$[^$]*\$/g, m => m.replace(/[\\${}]/g, ''))
+                           .replace(/`([^`]*)`/g, '$1')
+                           .toLowerCase()
+                           .replace(/[^a-z0-9\s]/g, ' ')
+                           .replace(/\s+/g, ' ').trim();
+
+    const correctClean = clean(correctAnswer);
+    const userClean = clean(userAnswer);
+
+    // Exact match
+    if (userClean === correctClean) return { score: 1.0, highlightedAnswer: correctAnswer };
+
+    // Keyword extraction
+    const stopwords = new Set(['the','a','an','is','are','was','were','be','been','being','of','in','to','for','on','with','at','by','and','or','it','its','this','that']);
+    const keywords = correctClean.split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w));
+    if (keywords.length === 0) {
+      const sim = this._similarity(userClean, correctClean);
+      return { score: sim, highlightedAnswer: correctAnswer };
+    }
+
+    const userWords = new Set(userClean.split(/\s+/));
+    let matched = 0;
+    const highlightParts = correctAnswer.split(/(\s+)/);
+    const highlighted = highlightParts.map(part => {
+      const cleanPart = clean(part);
+      if (!cleanPart || cleanPart.length <= 2) return part;
+      const isKeyword = keywords.includes(cleanPart);
+      if (!isKeyword) return part;
+      // Check fuzzy match
+      let found = false;
+      for (const uw of userWords) {
+        if (this._similarity(uw, cleanPart) >= 0.7) { found = true; break; }
+      }
+      if (found) { matched++; return `<span class="kw-match">${part}</span>`; }
+      return `<span class="kw-miss">${part}</span>`;
+    }).join('');
+
+    return { score: matched / keywords.length, highlightedAnswer: highlighted };
+  }
+
+  _similarity(a, b) {
+    if (a === b) return 1;
+    if (!a || !b) return 0;
+    const longer = a.length > b.length ? a : b;
+    const shorter = a.length > b.length ? b : a;
+    if (longer.length === 0) return 1;
+    const editDist = this._editDistance(longer, shorter);
+    return (longer.length - editDist) / longer.length;
+  }
+
+  _editDistance(a, b) {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b[i-1] === a[j-1]) matrix[i][j] = matrix[i-1][j-1];
+        else matrix[i][j] = Math.min(matrix[i-1][j-1]+1, matrix[i][j-1]+1, matrix[i-1][j]+1);
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+
+  nextQuestion() {
+    this.currentIndex++;
+    this.answered = false;
+    this.renderQuestion();
+  }
+
+  _showFinalScore() {
+    UIController.toast(`Quiz complete! Score: ${this.score}/${this.queue.length}`, 'success');
+    this.app.state.updateStreak();
+    this.app.ui.showView('dashboard');
+  }
+}
+
+/* ============================================================
+   MatchGame
+   ============================================================ */
+class MatchGame {
+  constructor(app) {
+    this.app = app;
+    this.tiles = [];
+    this.selected = null;
+    this.moves = 0;
+    this.pairsLeft = 0;
+    this.timer = 0;
+    this.timerInterval = null;
+    this.locked = false;
+    this._initEvents();
+  }
+
+  _initEvents() {
+    document.getElementById('match-restart').addEventListener('click', () => this.start());
+  }
+
+  start() {
+    const settings = this.app.state.getSettings();
+    const gridSize = settings.matchGrid || 12;
+    const pairCount = gridSize / 2;
+    this.moves = 0;
+    this.pairsLeft = pairCount;
+    this.selected = null;
+    this.locked = false;
+
+    // Pick random cards
+    const indices = [...Array(this.app.cards.length).keys()];
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const chosen = indices.slice(0, pairCount);
+
+    // Create tiles: each card becomes a question tile and answer tile
+    this.tiles = [];
+    chosen.forEach(idx => {
+      const card = this.app.cards[idx];
+      this.tiles.push({ type: 'q', cardIndex: idx, text: card.question, pairId: idx });
+      this.tiles.push({ type: 'a', cardIndex: idx, text: card.answer, pairId: idx });
+    });
+
+    // Shuffle tiles
+    for (let i = this.tiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.tiles[i], this.tiles[j]] = [this.tiles[j], this.tiles[i]];
+    }
+
+    this._renderGrid(gridSize);
+    this._startTimer();
+    this._updateStats();
+
+    document.getElementById('match-complete').style.display = 'none';
+    document.getElementById('match-grid').style.display = '';
+  }
+
+  _renderGrid(gridSize) {
+    const grid = document.getElementById('match-grid');
+    grid.className = gridSize <= 12 ? 'match-grid grid-4x3' : 'match-grid grid-4x4';
+    grid.innerHTML = '';
+
+    this.tiles.forEach((tile, i) => {
+      const el = document.createElement('div');
+      el.className = 'match-tile face-down';
+      el.dataset.index = i;
+      el.setAttribute('role', 'gridcell');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-label', 'Hidden card');
+
+      const label = document.createElement('span');
+      label.className = 'tile-label';
+      label.textContent = tile.type === 'q' ? 'Q' : 'A';
+
+      const content = document.createElement('span');
+      content.className = 'tile-content';
+      // Truncate long text for tiles
+      const displayText = tile.text.length > 60 ? tile.text.slice(0, 57) + '...' : tile.text;
+      content.textContent = displayText;
+
+      el.appendChild(label);
+      el.appendChild(content);
+
+      el.addEventListener('click', () => this._selectTile(i, el));
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._selectTile(i, el); }
+      });
+      grid.appendChild(el);
+    });
+  }
+
+  _selectTile(index, el) {
+    if (this.locked) return;
+    if (el.classList.contains('matched')) return;
+    if (this.selected !== null && this.selected.index === index) return;
+
+    el.classList.remove('face-down');
+    el.classList.add('selected');
+    el.setAttribute('aria-label', this.tiles[index].text);
+
+    if (this.selected === null) {
+      this.selected = { index, el };
+    } else {
+      this.moves++;
+      this.locked = true;
+      const first = this.selected;
+      const second = { index, el };
+
+      if (this.tiles[first.index].pairId === this.tiles[second.index].pairId &&
+          this.tiles[first.index].type !== this.tiles[second.index].type) {
+        // Match!
+        setTimeout(() => {
+          first.el.classList.remove('selected');
+          second.el.classList.remove('selected');
+          first.el.classList.add('matched');
+          second.el.classList.add('matched');
+          this.pairsLeft--;
+          this.locked = false;
+          this.selected = null;
+          this._updateStats();
+          // Rate as correct
+          this.app.sr.review(this.tiles[first.index].cardIndex, 4);
+          if (this.pairsLeft === 0) this._complete();
+        }, 400);
+      } else {
+        // No match — show a Continue button so the player can read both tiles
+        first.el.classList.add('wrong');
+        second.el.classList.add('wrong');
+        this._showMatchContinue(() => {
+          first.el.classList.remove('selected', 'wrong');
+          second.el.classList.remove('selected', 'wrong');
+          first.el.classList.add('face-down');
+          second.el.classList.add('face-down');
+          first.el.setAttribute('aria-label', 'Hidden card');
+          second.el.setAttribute('aria-label', 'Hidden card');
+          this.locked = false;
+          this.selected = null;
+        });
+      }
+      this._updateStats();
+    }
+  }
+
+  _startTimer() {
+    this.timer = 0;
+    clearInterval(this.timerInterval);
+    this.timerInterval = setInterval(() => {
+      this.timer++;
+      const m = Math.floor(this.timer / 60);
+      const s = this.timer % 60;
+      document.getElementById('match-timer').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+    }, 1000);
+  }
+
+  _showMatchContinue(callback) {
+    // Remove any existing continue button
+    const old = document.getElementById('match-continue-btn');
+    if (old) old.remove();
+
+    const grid = document.getElementById('match-grid');
+    const btn = document.createElement('button');
+    btn.id = 'match-continue-btn';
+    btn.className = 'btn btn-secondary match-continue-btn';
+    btn.textContent = 'Continue';
+    btn.setAttribute('aria-label', 'Dismiss wrong pair and continue');
+    grid.parentNode.insertBefore(btn, grid.nextSibling);
+    btn.focus();
+
+    const dismiss = () => {
+      btn.remove();
+      callback();
+    };
+    btn.addEventListener('click', dismiss);
+    // Also allow Space/Enter while the button has focus
+    btn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dismiss(); }
+    });
+  }
+
+  _updateStats() {
+    document.getElementById('match-moves').textContent = this.moves;
+    document.getElementById('match-pairs-left').textContent = this.pairsLeft;
+  }
+
+  _complete() {
+    clearInterval(this.timerInterval);
+    this.app.state.updateStreak();
+    const m = Math.floor(this.timer / 60);
+    const s = this.timer % 60;
+
+    document.getElementById('match-grid').style.display = 'none';
+    const complete = document.getElementById('match-complete');
+    complete.style.display = '';
+    complete.innerHTML = `
+      <h2>Match Complete!</h2>
+      <div class="stats-grid">
+        <div class="dash-card glass"><div class="dash-value cyan">${this.moves}</div><div class="dash-label">Moves</div></div>
+        <div class="dash-card glass"><div class="dash-value magenta">${m}:${s.toString().padStart(2, '0')}</div><div class="dash-label">Time</div></div>
+      </div>
+      <button class="btn btn-primary" onclick="app.matchGame.start()">Play Again</button>
+    `;
+  }
+
+  destroy() { clearInterval(this.timerInterval); }
+}
+
+/* ============================================================
+   SpeedRound
+   ============================================================ */
+class SpeedRound {
+  constructor(app) {
+    this.app = app;
+    this.timeLimit = 60;
+    this.timeLeft = 60;
+    this.timerInterval = null;
+    this.queue = [];
+    this.currentIndex = 0;
+    this.known = 0;
+    this.unknown = 0;
+    this.running = false;
+    this._initEvents();
+  }
+
+  _initEvents() {
+    document.querySelectorAll('.speed-time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.speed-time-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.timeLimit = parseInt(btn.dataset.time);
+      });
+    });
+
+    document.getElementById('speed-start').addEventListener('click', () => this._startRound());
+    document.getElementById('speed-know').addEventListener('click', () => this._answer(true));
+    document.getElementById('speed-dont-know').addEventListener('click', () => this._answer(false));
+    document.getElementById('speed-again').addEventListener('click', () => this._showSetup());
+
+    // Keyboard
+    document.addEventListener('keydown', e => {
+      if (this.app.ui.currentView !== 'speed' || !this.running) return;
+      if (e.key === 'ArrowRight' || e.key === 'k') this._answer(true);
+      if (e.key === 'ArrowLeft' || e.key === 'j') this._answer(false);
+    });
+
+    // Swipe detection
+    const card = document.getElementById('speed-card');
+    let startX = 0;
+    card.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+    card.addEventListener('touchend', e => {
+      if (!this.running) return;
+      const diff = e.changedTouches[0].clientX - startX;
+      if (Math.abs(diff) > 60) {
+        this._answer(diff > 0);
+      }
+    }, { passive: true });
+  }
+
+  _showSetup() {
+    document.getElementById('speed-setup-screen').style.display = '';
+    document.getElementById('speed-play-screen').style.display = 'none';
+    document.getElementById('speed-results-screen').style.display = 'none';
+  }
+
+  _startRound() {
+    this.queue = [...Array(this.app.cards.length).keys()];
+    // Shuffle
+    for (let i = this.queue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.queue[i], this.queue[j]] = [this.queue[j], this.queue[i]];
+    }
+    this.currentIndex = 0;
+    this.known = 0;
+    this.unknown = 0;
+    this.timeLeft = this.timeLimit;
+    this.running = true;
+
+    document.getElementById('speed-setup-screen').style.display = 'none';
+    document.getElementById('speed-play-screen').style.display = '';
+    document.getElementById('speed-results-screen').style.display = 'none';
+
+    this._renderCard();
+    this._startTimer();
+  }
+
+  _renderCard() {
+    if (this.currentIndex >= this.queue.length) {
+      this._endRound();
+      return;
+    }
+    const idx = this.queue[this.currentIndex];
+    const card = this.app.cards[idx];
+    const type = CardRenderer.detectType(card.question, card.answer);
+    const el = document.getElementById('speed-question');
+    CardRenderer.renderToElement(el, card.question, type);
+
+    document.getElementById('speed-card').className = 'speed-card glass';
+    document.getElementById('speed-counter').textContent = `${this.known + this.unknown} cards`;
+    document.getElementById('speed-progress').style.width = `${((this.currentIndex) / this.queue.length) * 100}%`;
+  }
+
+  _answer(knows) {
+    if (!this.running) return;
+    const idx = this.queue[this.currentIndex];
+    const card = document.getElementById('speed-card');
+
+    if (knows) {
+      this.known++;
+      card.classList.add('swipe-right');
+      this.app.sr.review(idx, 4);
+    } else {
+      this.unknown++;
+      card.classList.add('swipe-left');
+      this.app.sr.review(idx, 0);
+    }
+
+    setTimeout(() => {
+      this.currentIndex++;
+      this._renderCard();
+    }, 200);
+  }
+
+  _startTimer() {
+    document.getElementById('speed-timer').textContent = this.timeLeft;
+    clearInterval(this.timerInterval);
+    this.timerInterval = setInterval(() => {
+      this.timeLeft--;
+      const timerEl = document.getElementById('speed-timer');
+      timerEl.textContent = this.timeLeft;
+      timerEl.className = 'speed-timer' + (this.timeLeft <= 10 ? ' danger' : this.timeLeft <= 20 ? ' warning' : '');
+      if (this.timeLeft <= 0) this._endRound();
+    }, 1000);
+  }
+
+  _endRound() {
+    this.running = false;
+    clearInterval(this.timerInterval);
+    this.app.state.updateStreak();
+
+    const total = this.known + this.unknown;
+    const pct = total > 0 ? Math.round((this.known / total) * 100) : 0;
+
+    document.getElementById('speed-play-screen').style.display = 'none';
+    document.getElementById('speed-results-screen').style.display = '';
+
+    document.getElementById('speed-result-score').textContent = `${pct}%`;
+    document.getElementById('speed-result-detail').textContent = `${this.known} known, ${this.unknown} missed out of ${total} cards`;
+
+    document.getElementById('speed-result-stats').innerHTML = `
+      <div class="dash-card glass"><div class="dash-value success">${this.known}</div><div class="dash-label">Known</div></div>
+      <div class="dash-card glass"><div class="dash-value error" style="color:var(--error)">${this.unknown}</div><div class="dash-label">Missed</div></div>
+      <div class="dash-card glass"><div class="dash-value cyan">${total}</div><div class="dash-label">Total</div></div>
+      <div class="dash-card glass"><div class="dash-value warning">${this.timeLimit - this.timeLeft}s</div><div class="dash-label">Time Used</div></div>
+    `;
+  }
+
+  destroy() {
+    this.running = false;
+    clearInterval(this.timerInterval);
+  }
+}
+
+/* ============================================================
+   Dashboard
+   ============================================================ */
+class Dashboard {
+  constructor(app) { this.app = app; }
+
+  render() {
+    const stats = this.app.sr.getStats(this.app.cards.length);
+    const streak = this.app.state.getStreak();
+
+    // Summary stats
+    document.getElementById('dash-stats').innerHTML = `
+      <div class="dash-card glass"><div class="dash-value cyan">${stats.total}</div><div class="dash-label">Total Cards</div></div>
+      <div class="dash-card glass"><div class="dash-value success">${stats.accuracy}%</div><div class="dash-label">Accuracy</div></div>
+      <div class="dash-card glass"><div class="dash-value magenta">${streak.current}</div><div class="dash-label">Day Streak</div></div>
+      <div class="dash-card glass"><div class="dash-value warning">${stats.due}</div><div class="dash-label">Cards Due</div></div>
+    `;
+
+    // SVG Rings
+    this._renderRings(stats);
+
+    // Heatmap
+    this._renderHeatmap();
+  }
+
+  _renderRings(stats) {
+    const container = document.getElementById('dash-rings');
+    const rings = [
+      { label: 'New', value: stats.newCount, total: stats.total, color: 'var(--cyan)' },
+      { label: 'Learning', value: stats.learning, total: stats.total, color: 'var(--warning)' },
+      { label: 'Mastered', value: stats.mastered, total: stats.total, color: 'var(--success)' }
+    ];
+
+    const ringHTML = rings.map(r => {
+      const pct = r.total > 0 ? r.value / r.total : 0;
+      const circumference = 2 * Math.PI * 42;
+      const offset = circumference * (1 - pct);
+      return `
+        <div class="ring-item">
+          <svg viewBox="0 0 100 100" aria-label="${r.label}: ${r.value} of ${r.total}">
+            <circle class="ring-track" cx="50" cy="50" r="42" />
+            <circle class="ring-fill" cx="50" cy="50" r="42"
+              stroke="${r.color}"
+              stroke-dasharray="${circumference}"
+              stroke-dashoffset="${offset}"
+              transform="rotate(-90 50 50)" />
+            <text class="ring-center" x="50" y="50">${r.value}</text>
+          </svg>
+          <div class="ring-label">${r.label}</div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `<h3>Card Distribution</h3><div class="rings-row">${ringHTML}</div>`;
+  }
+
+  _renderHeatmap() {
+    const container = document.getElementById('dash-heatmap');
+    let cells = '';
+    for (let i = 0; i < this.app.cards.length; i++) {
+      const s = this.app.sr.getState(i);
+      let level = 0;
+      if (s.totalReviews > 0) {
+        if (s.mastery >= 80) level = 5;
+        else if (s.mastery >= 60) level = 4;
+        else if (s.mastery >= 40) level = 3;
+        else if (s.mastery >= 20) level = 2;
+        else level = 1;
+      }
+      const q = this.app.cards[i].question;
+      const label = q.length > 30 ? q.slice(0, 27) + '...' : q;
+      cells += `<div class="heat-cell heat-${level}" title="${label}: ${s.mastery}% mastery"></div>`;
+    }
+    container.innerHTML = `<h3>Mastery Heat Map</h3><div class="heatmap-grid">${cells}</div>`;
+  }
+}
+
+/* ============================================================
+   DeckManager
+   ============================================================ */
+class DeckManager {
+  constructor(app) {
+    this.app = app;
+    this.activeFilter = 'all';
+    this.searchQuery = '';
+    this.showMissedOnly = false;
+    this.showStarredOnly = false;
+    this.showDueOnly = false;
+    this._initEvents();
+  }
+
+  _initEvents() {
+    document.getElementById('deck-search').addEventListener('input', e => {
+      this.searchQuery = e.target.value.toLowerCase();
+      this.render();
+    });
+
+    document.getElementById('filter-chips').addEventListener('click', e => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      document.querySelectorAll('#filter-chips .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      this.activeFilter = chip.dataset.filter;
+      this.render();
+    });
+
+    document.getElementById('deck-shuffle').addEventListener('click', () => {
+      this.app.shuffleCards();
+      this.render();
+      UIController.toast('Deck shuffled!', 'info');
+    });
+
+    document.getElementById('deck-missed').addEventListener('click', () => {
+      this.showMissedOnly = !this.showMissedOnly;
+      document.getElementById('deck-missed').classList.toggle('active', this.showMissedOnly);
+      if (this.showMissedOnly) { this.showStarredOnly = false; this.showDueOnly = false; }
+      this.render();
+    });
+
+    document.getElementById('deck-starred').addEventListener('click', () => {
+      this.showStarredOnly = !this.showStarredOnly;
+      document.getElementById('deck-starred').classList.toggle('active', this.showStarredOnly);
+      if (this.showStarredOnly) { this.showMissedOnly = false; this.showDueOnly = false; }
+      this.render();
+    });
+
+    document.getElementById('deck-due').addEventListener('click', () => {
+      this.showDueOnly = !this.showDueOnly;
+      document.getElementById('deck-due').classList.toggle('active', this.showDueOnly);
+      if (this.showDueOnly) { this.showMissedOnly = false; this.showStarredOnly = false; }
+      this.render();
+    });
+  }
+
+  render() {
+    const list = document.getElementById('card-list');
+    const empty = document.getElementById('deck-empty');
+    const bookmarks = this.app.state.getBookmarks();
+    const dueSet = new Set(this.app.sr.getDueCards(this.app.cards.length));
+
+    let filtered = this.app.cards.map((card, i) => ({ ...card, index: i }));
+
+    // Type filter
+    if (this.activeFilter !== 'all') {
+      filtered = filtered.filter(c => CardRenderer.detectType(c.question, c.answer) === this.activeFilter);
+    }
+
+    // Search
+    if (this.searchQuery) {
+      filtered = filtered.filter(c =>
+        c.question.toLowerCase().includes(this.searchQuery) ||
+        c.answer.toLowerCase().includes(this.searchQuery)
+      );
+    }
+
+    // Missed only
+    if (this.showMissedOnly) {
+      filtered = filtered.filter(c => {
+        const s = this.app.sr.getState(c.index);
+        return s.totalReviews > 0 && s.lastRating !== null && s.lastRating < 3;
+      });
+    }
+
+    // Starred only
+    if (this.showStarredOnly) {
+      filtered = filtered.filter(c => bookmarks.has(c.index));
+    }
+
+    // Due only
+    if (this.showDueOnly) {
+      filtered = filtered.filter(c => dueSet.has(c.index));
+    }
+
+    if (filtered.length === 0) {
+      list.innerHTML = '';
+      empty.style.display = '';
+      return;
+    }
+
+    empty.style.display = 'none';
+    list.innerHTML = filtered.map(c => {
+      const s = this.app.sr.getState(c.index);
+      const type = CardRenderer.detectType(c.question, c.answer);
+      const starred = bookmarks.has(c.index);
+      const masteryClass = s.mastery >= 80 ? 'mastery-high' : s.mastery >= 40 ? 'mastery-mid' : 'mastery-low';
+      return `
+        <div class="card-list-item glass">
+          <span class="card-type-badge ${CardRenderer.getBadgeClass(type)}" style="font-size:0.6rem">${type}</span>
+          <span class="card-q">${this._escapeHtml(c.question)}</span>
+          <span class="card-mastery ${masteryClass}">${s.mastery}%</span>
+          <button class="card-star ${starred ? 'starred' : ''}" data-index="${c.index}" aria-label="${starred ? 'Unstar' : 'Star'}">${starred ? '\u2605' : '\u2606'}</button>
+        </div>
+      `;
+    }).join('');
+
+    // Star toggle events
+    list.querySelectorAll('.card-star').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.index);
+        const isStarred = this.app.state.toggleBookmark(idx);
+        btn.classList.toggle('starred', isStarred);
+        btn.textContent = isStarred ? '\u2605' : '\u2606';
+      });
+    });
+  }
+
+  _escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+}
+
+/* ============================================================
+   BackgroundAnimation — Canvas particles
+   ============================================================ */
+class BackgroundAnimation {
+  constructor() {
+    this.canvas = document.getElementById('particle-canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.particles = [];
+    this.running = true;
+    this.lastFrame = 0;
+    this.frameInterval = 1000 / 30; // 30fps
+
+    this._resize();
+    this._createParticles();
+    this._animate = this._animate.bind(this);
+    requestAnimationFrame(this._animate);
+
+    window.addEventListener('resize', () => this._resize());
+    document.addEventListener('visibilitychange', () => {
+      this.running = !document.hidden;
+      if (this.running) requestAnimationFrame(this._animate);
+    });
+  }
+
+  _resize() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+  }
+
+  _createParticles() {
+    const count = Math.min(50, Math.floor((window.innerWidth * window.innerHeight) / 25000));
+    this.particles = [];
+    for (let i = 0; i < count; i++) {
+      this.particles.push({
+        x: Math.random() * this.canvas.width,
+        y: Math.random() * this.canvas.height,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        radius: Math.random() * 2 + 0.5,
+        alpha: Math.random() * 0.4 + 0.1,
+        color: Math.random() > 0.5 ? '0,245,255' : '255,0,229'
+      });
+    }
+  }
+
+  _animate(timestamp) {
+    if (!this.running) return;
+    requestAnimationFrame(this._animate);
+
+    if (timestamp - this.lastFrame < this.frameInterval) return;
+    this.lastFrame = timestamp;
+
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    for (const p of this.particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+
+      if (p.x < 0) p.x = this.canvas.width;
+      if (p.x > this.canvas.width) p.x = 0;
+      if (p.y < 0) p.y = this.canvas.height;
+      if (p.y > this.canvas.height) p.y = 0;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+      ctx.fill();
+    }
+  }
+}
+
+/* ============================================================
+   App — Main orchestrator
+   ============================================================ */
+class App {
+  constructor() {
+    this.cards = [];
+    this.csvText = '';
+    this.state = new StateManager();
+    this.sr = new SpacedRepetition(this.state);
+    this.ui = new UIController();
+    this.classicFlip = new ClassicFlipMode(this);
+    this.quizMode = new QuizMode(this);
+    this.matchGame = new MatchGame(this);
+    this.speedRound = new SpeedRound(this);
+    this.dashboard = new Dashboard(this);
+    this.deckManager = new DeckManager(this);
+    this.bg = new BackgroundAnimation();
+
+    this._initUpload();
+    this._initSettings();
+    this._renderRecentDecks();
+
+    // View change handler
+    window.addEventListener('viewchange', e => {
+      const view = e.detail.view;
+      if (view === 'classic' && this.cards.length) {
+        const settings = this.state.getSettings();
+        const queue = this.sr.getSessionQueue(this.cards.length, settings.sessionSize);
+        this.classicFlip.start(queue);
+      }
+      if (view === 'quiz' && this.cards.length) this.quizMode.start([]);
+      if (view === 'match' && this.cards.length) this.matchGame.start();
+      if (view === 'speed') this.speedRound._showSetup();
+      if (view === 'dashboard' && this.cards.length) this.dashboard.render();
+      if (view === 'manage' && this.cards.length) this.deckManager.render();
+    });
+  }
+
+  _initUpload() {
+    const zone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+
+    zone.addEventListener('click', () => fileInput.click());
+    zone.addEventListener('keydown', e => { if (e.key === 'Enter') fileInput.click(); });
+
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      if (e.dataTransfer.files.length) this._handleFile(e.dataTransfer.files[0]);
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) this._handleFile(fileInput.files[0]);
+    });
+
+    document.getElementById('paste-btn').addEventListener('click', () => {
+      const text = document.getElementById('paste-area').value;
+      if (text.trim()) this._loadCSV(text, 'Pasted Deck');
+    });
+  }
+
+  _handleFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const name = file.name.replace(/\.[^.]+$/, '');
+      this._loadCSV(e.target.result, name);
+    };
+    reader.readAsText(file);
+  }
+
+  _loadCSV(text, name) {
+    this.csvText = text;
+    this.cards = CSVParser.parse(text);
+
+    if (this.cards.length === 0) {
+      UIController.toast('No valid cards found. Format: question,answer per line.', 'error');
+      return;
+    }
+
+    const hash = CSVParser.hashContent(text);
+    this.state.setDeck(hash, name);
+    this.state.saveDeckMeta(hash, name, this.cards.length);
+    this.ui.enableModes();
+    this.ui.setDeckInfo(`${name} (${this.cards.length} cards)`);
+
+    // Detect card types
+    const types = {};
+    this.cards.forEach(c => {
+      const t = CardRenderer.detectType(c.question, c.answer);
+      types[t] = (types[t] || 0) + 1;
+    });
+
+    UIController.toast(`Loaded ${this.cards.length} cards!`, 'success');
+    this.ui.showView('classic');
+  }
+
+  loadDeckByHash(hash) {
+    // Find saved deck meta and try to reload
+    const decks = this.state.getSavedDecks();
+    const deck = decks.find(d => d.hash === hash);
+    if (!deck) return;
+
+    // We can't reload the CSV content, but we can check if card states exist
+    // For now, prompt user to re-upload
+    UIController.toast('Please re-upload the CSV file to continue studying.', 'info');
+  }
+
+  shuffleCards() {
+    for (let i = this.cards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
+    }
+  }
+
+  _initSettings() {
+    document.getElementById('settings-close').addEventListener('click', () => {
+      document.getElementById('settings-modal').classList.remove('active');
+    });
+
+    document.getElementById('settings-save').addEventListener('click', () => {
+      const settings = {
+        sessionSize: parseInt(document.getElementById('setting-session-size').value) || 20,
+        speedTime: parseInt(document.getElementById('setting-speed-time').value) || 60,
+        matchGrid: parseInt(document.getElementById('setting-match-grid').value) || 12
+      };
+      this.state.saveSettings(settings);
+      document.getElementById('settings-modal').classList.remove('active');
+      UIController.toast('Settings saved!', 'success');
+    });
+
+    // Load current settings
+    const s = this.state.getSettings();
+    document.getElementById('setting-session-size').value = s.sessionSize;
+    document.getElementById('setting-speed-time').value = s.speedTime;
+    document.getElementById('setting-match-grid').value = s.matchGrid;
+
+    // Dashboard reset
+    document.getElementById('dash-reset').addEventListener('click', () => {
+      if (confirm('Reset all progress for this deck? This cannot be undone.')) {
+        this.state.resetDeckProgress();
+        this.dashboard.render();
+        UIController.toast('Progress reset.', 'info');
+      }
+    });
+  }
+
+  _renderRecentDecks() {
+    const container = document.getElementById('recent-decks');
+    const decks = this.state.getSavedDecks()
+      .sort((a, b) => b.lastUsed - a.lastUsed)
+      .slice(0, 5);
+
+    if (decks.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const items = decks.map(d => {
+      const date = new Date(d.lastUsed).toLocaleDateString();
+      return `
+        <div class="deck-item glass" data-hash="${d.hash}">
+          <div class="deck-item-info">
+            <h4>${d.name}</h4>
+            <p>${d.count} cards &middot; Last used ${date}</p>
+          </div>
+          <div class="deck-item-actions">
+            <button class="deck-delete" data-hash="${d.hash}" aria-label="Delete deck">&times;</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `<h3>Recent Decks</h3>${items}`;
+
+    container.querySelectorAll('.deck-item').forEach(el => {
+      el.addEventListener('click', e => {
+        if (e.target.closest('.deck-delete')) return;
+        this.loadDeckByHash(el.dataset.hash);
+      });
+    });
+
+    container.querySelectorAll('.deck-delete').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        this.state.removeDeck(btn.dataset.hash);
+        this._renderRecentDecks();
+        UIController.toast('Deck removed.', 'info');
+      });
+    });
+  }
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+let app;
+document.addEventListener('DOMContentLoaded', () => {
+  // Wait for KaTeX to load
+  const waitForKatex = () => {
+    if (typeof renderMathInElement === 'function') {
+      app = new App();
+    } else {
+      setTimeout(waitForKatex, 100);
+    }
+  };
+  waitForKatex();
+});
+</script>
+</body>
+</html>
