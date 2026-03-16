@@ -4,8 +4,23 @@ multi_agent.py — LangChain 1.x multi-agent system (GPT-4o)
 
 Architecture:
     Orchestrator Agent
-        ├── Systems Engineering Agent  →  output/systems/
-        └── Coding Agent               →  output/coding/
+        ├── Systems Engineering Agent  ->  output/systems/
+        └── Coding Agent               ->  output/coding/
+
+Agent configuration:
+    All agents are defined in AGENT_REGISTRY as AgentConfig dataclasses.
+    Adding a new agent is a single block — no other code needs to change.
+    The orchestrator's prompt and tool list are generated from the registry
+    at build time, so they stay in sync automatically.
+
+    Each AgentConfig declares:
+      name               unique id and output subfolder name
+      description        one-liner used in the orchestrator's roster and tool docs
+      system_prompt      full instructions; use {var} placeholders for dynamic values
+      allowed_extensions write sandbox (empty set = read-only agent)
+      handoffs           names of agents this agent can delegate to
+      prompt_vars        static substitutions resolved at build time
+    Agents with handoffs also get {agent_roster} injected automatically.
 
 Context sharing:
     Orchestrator owns a shared state dict updated after every agent call.
@@ -34,6 +49,7 @@ Install:
 import os
 import csv
 import argparse
+from dataclasses import dataclass, field
 from pathlib import Path
 from datetime import datetime
 
@@ -54,26 +70,129 @@ WORK_LOG             = OUTPUT_DIR / "work_log.csv"
 MODEL                = "gpt-4o"
 MAX_INJECT_TOKENS    = 2000   # max tokens for file content injected into any prompt
 STATE_SUMMARY_TOKENS = 800    # max tokens for state summary injected per call
-
-AGENT_DIRS: dict[str, Path] = {
-    "systems": OUTPUT_DIR / "systems",
-    "coding":  OUTPUT_DIR / "coding",
-}
-
-# Each agent may only write files with these extensions
-ALLOWED_WRITE_EXTENSIONS: dict[str, set[str]] = {
-    "systems": {".csv", ".md", ".txt"},
-    "coding":  {".py", ".html", ".md", ".txt"},
-}
+ORCHESTRATOR_NAME    = "orchestrator"  # which registry entry drives the top-level run
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SETUP
+# AGENT CONFIG  (single source of truth for every agent)
 # ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class AgentConfig:
+    """
+    Defines one agent's complete identity.
+
+    Fields:
+        name               Unique id. Also used as the output subfolder name and
+                           the tool name exposed to the orchestrator ({name}_agent).
+        description        One-liner describing what this agent does.
+                           Shown in the orchestrator's roster and as the tool docstring.
+        system_prompt      Full instruction string for the LLM. Supports {var}
+                           placeholders resolved at build time via prompt_vars.
+                           Agents with handoffs also receive {agent_roster} automatically.
+        allowed_extensions Set of file extensions this agent may write.
+                           Empty set = read-only (e.g. orchestrator).
+        handoffs           Ordered list of agent names this agent can delegate to.
+                           Drives tool creation — no other wiring needed.
+        prompt_vars        Static key/value substitutions resolved in system_prompt
+                           at build time. Dynamic values (like agent_roster) are
+                           injected automatically and do not need to appear here.
+    """
+    name:               str
+    description:        str
+    system_prompt:      str
+    allowed_extensions: set[str]         = field(default_factory=set)
+    handoffs:           list[str]        = field(default_factory=list)
+    prompt_vars:        dict[str, str]   = field(default_factory=dict)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AGENT REGISTRY
+# To add a new agent: add an AgentConfig entry below and reference its name in
+# the orchestrator's handoffs list. Nothing else needs to change.
+# ─────────────────────────────────────────────────────────────────────────────
+
+AGENT_REGISTRY: dict[str, AgentConfig] = {cfg.name: cfg for cfg in [
+
+    AgentConfig(
+        name        = "systems",
+        description = "breaks goals into requirements, writes {requirements_file}",
+        system_prompt = """\
+You are a senior systems engineer. Your job is to translate a project goal
+into clear, structured requirements that a developer can implement directly.
+
+RULES:
+- Produce 5-10 concrete, testable requirements.
+- Save them as {requirements_file} with exactly these columns:
+    id, title, description, priority, status
+  where priority is High / Med / Low and status is Open.
+- Do not add extra columns or change column names.
+- After saving, return a 2-3 sentence summary of what you defined.
+
+Your output directory already exists. Write directly using write_file.""",
+        allowed_extensions = {".csv", ".md", ".txt"},
+        handoffs           = [],
+        prompt_vars        = {"requirements_file": "requirements.csv"},
+    ),
+
+    AgentConfig(
+        name        = "coding",
+        description = "reads {requirements_file} and writes Python implementation",
+        system_prompt = """\
+You are a senior Python engineer. Your job is to implement working code
+that satisfies the project requirements.
+
+RULES:
+- Always start by calling read_file("{requirements_file}") to load requirements.
+- Write clean, well-documented Python (docstrings + inline comments).
+- Save your implementation to a descriptively named .py file.
+- After saving, return a brief summary: what you built and which
+  requirement IDs your implementation covers.
+
+Your output directory already exists. Write directly using write_file.""",
+        allowed_extensions = {".py", ".html", ".md", ".txt"},
+        handoffs           = [],
+        prompt_vars        = {"requirements_file": "requirements.csv"},
+    ),
+
+    AgentConfig(
+        name        = ORCHESTRATOR_NAME,
+        description = "coordinates all specialist agents toward the project goal",
+        system_prompt = """\
+You are a project orchestrator coordinating these specialist agents:
+{agent_roster}
+
+YOUR WORKFLOW for every goal (follow this order):
+1. Delegate to agents in logical sequence based on their descriptions.
+2. Pass relevant context from prior agents' outputs to subsequent agents.
+3. Request at most one targeted revision per agent if output is incomplete.
+4. Return a concise final summary: agents called, files created, coverage notes.
+
+Keep your delegation prompts specific and actionable.""",
+        allowed_extensions = set(),          # orchestrator does not write files
+        handoffs           = ["systems", "coding"],
+        prompt_vars        = {},             # {agent_roster} is auto-injected
+    ),
+
+]}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SETUP  (derives directories from registry, not hardcoded)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def agent_dir(cfg: AgentConfig) -> Path:
+    """Output directory for an agent — OUTPUT_DIR / agent.name."""
+    return OUTPUT_DIR / cfg.name
+
 
 def setup() -> None:
-    """Create output directories and initialize the work log if needed."""
-    for d in [OUTPUT_DIR, *AGENT_DIRS.values()]:
+    """Create all agent output directories and initialize the work log."""
+    dirs = [OUTPUT_DIR] + [
+        agent_dir(cfg) for cfg in AGENT_REGISTRY.values()
+        if cfg.allowed_extensions          # only agents that write files need a dir
+    ]
+    for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
     if not WORK_LOG.exists():
         with open(WORK_LOG, "w", newline="", encoding="utf-8") as f:
@@ -84,8 +203,6 @@ def setup() -> None:
 # SHARED STATE
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Single source of truth for all completed work.
-# Only orchestrator tooling writes to this; sub-agents never touch it directly.
 state: dict = {
     "goal":  "",
     "steps": [],   # list of {agent, action, file, summary}
@@ -104,10 +221,7 @@ def record_step(agent: str, action: str, file: str, summary: str) -> None:
 
 
 def build_state_summary() -> str:
-    """
-    Compact text snapshot of all completed work.
-    Token-capped before injection so it never blows out a prompt budget.
-    """
+    """Compact snapshot of completed work, safe to inject into any prompt."""
     lines = [f"GOAL: {state['goal']}"]
     if state["steps"]:
         lines.append("WORK COMPLETED SO FAR:")
@@ -128,7 +242,7 @@ def build_state_summary() -> str:
 try:
     _enc = tiktoken.encoding_for_model(MODEL)
 except KeyError:
-    _enc = tiktoken.get_encoding("cl100k_base")   # GPT-4 family fallback
+    _enc = tiktoken.get_encoding("cl100k_base")
 
 
 def token_count(text: str) -> int:
@@ -136,39 +250,63 @@ def token_count(text: str) -> int:
 
 
 def safe_inject(content: str, max_tokens: int = MAX_INJECT_TOKENS) -> str:
-    """
-    Truncate content to stay within a token budget before injecting into a prompt.
-    Appends a visible notice when truncation occurs.
-    """
+    """Truncate content to a token budget. Appends a notice when cut."""
     tokens = _enc.encode(content)
     if len(tokens) <= max_tokens:
         return content
     truncated = _enc.decode(tokens[:max_tokens])
     return (
         truncated
-        + f"\n... [TRUNCATED — {len(tokens)} tokens total, showing first {max_tokens}]"
+        + f"\n... [TRUNCATED -- {len(tokens)} tokens total, showing first {max_tokens}]"
     )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TOOL FACTORY  (one sandboxed set of tools per agent)
+# PROMPT RESOLUTION  (applies prompt_vars + auto-injects agent_roster)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def make_file_tools(agent_name: str, dry_run: bool = False) -> list:
+def resolve_prompt(cfg: AgentConfig, registry: dict[str, AgentConfig]) -> str:
+    """
+    Resolve a config's system_prompt at build time.
+
+    1. If the agent has handoffs, build an {agent_roster} string from the
+       descriptions of the target agents and inject it automatically.
+    2. Apply any static prompt_vars via str.format().
+
+    This keeps the prompt template readable while making the final string
+    fully concrete before it reaches the LLM.
+    """
+    vars_: dict[str, str] = dict(cfg.prompt_vars)
+
+    if cfg.handoffs:
+        roster_lines = [
+            f"  - {name}_agent  --  {registry[name].description.format(**registry[name].prompt_vars)}"
+            for name in cfg.handoffs
+            if name in registry
+        ]
+        vars_["agent_roster"] = "\n".join(roster_lines)
+
+    return cfg.system_prompt.format(**vars_) if vars_ else cfg.system_prompt
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOOL FACTORY  (sandboxed per agent, derived from AgentConfig)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def make_file_tools(cfg: AgentConfig, registry: dict[str, AgentConfig],
+                    dry_run: bool = False) -> list:
     """
     Build [read_folder, read_file, write_file] tools for one agent.
 
-    Sandboxing rules:
-      write_file  → only to this agent's own directory, allowed extensions only
-      read_file   → own directory first, then sibling directories (read-only)
-                    Enables cross-agent collaboration: coding agent can read
-                    systems agent's requirements.csv without any special wiring.
+    Sandboxing:
+      write_file  -> cfg's own directory only, cfg.allowed_extensions only
+      read_file   -> own directory first, then all other agent directories
+                     (read-only cross-agent access for collaboration)
     """
-    sandbox  = AGENT_DIRS[agent_name]
-    allowed  = ALLOWED_WRITE_EXTENSIONS[agent_name]
-    all_dirs = list(AGENT_DIRS.values())
+    sandbox  = agent_dir(cfg)
+    allowed  = cfg.allowed_extensions
+    all_dirs = [agent_dir(c) for c in registry.values() if c.allowed_extensions]
 
-    # ── read_folder ───────────────────────────────────────────────────────────
     def read_folder(subfolder: str = "") -> str:
         """List files in this agent's output directory."""
         target = sandbox / subfolder if subfolder else sandbox
@@ -179,51 +317,45 @@ def make_file_tools(agent_name: str, dry_run: bool = False) -> list:
             return "Directory is empty."
         return "\n".join(f"{f.name}  ({f.stat().st_size} bytes)" for f in files)
 
-    # ── read_file ─────────────────────────────────────────────────────────────
     def read_file(filename: str) -> str:
-        """
-        Read a file by name. Searches own folder first, then other agents'
-        folders for cross-agent collaboration. Content is token-limited.
-        """
+        """Read a file. Searches own folder first, then all other agent folders."""
         candidates = [sandbox / filename] + [d / filename for d in all_dirs]
         for path in candidates:
             if path.exists() and path.is_file():
                 try:
-                    raw = path.read_text(encoding="utf-8")
-                    injected = safe_inject(raw)
-                    origin = "own" if path.parent == sandbox else path.parent.name
+                    raw     = path.read_text(encoding="utf-8")
+                    origin  = "own" if path.parent == sandbox else path.parent.name
                     record_step(
-                        agent_name, "read_file", path.name,
+                        cfg.name, "read_file", path.name,
                         f"Read {filename} ({token_count(raw)} tokens, from {origin} folder)"
                     )
-                    return injected
+                    return safe_inject(raw)
                 except Exception as e:
                     return f"Error reading {filename}: {e}"
         return f"File not found: {filename}"
 
-    # ── write_file ────────────────────────────────────────────────────────────
     def write_file(filename: str, content: str) -> str:
         """Write content to a file in this agent's output directory."""
         ext = Path(filename).suffix.lower()
         if ext not in allowed:
             return (
-                f"Extension '{ext}' not allowed for {agent_name} agent. "
+                f"Extension '{ext}' not allowed for {cfg.name} agent. "
                 f"Allowed: {sorted(allowed)}"
             )
         path = sandbox / filename
         if dry_run:
             record_step(
-                agent_name, "write_file[DRY]", filename,
+                cfg.name, "write_file[DRY]", filename,
                 f"DRY RUN: would write {filename} ({len(content.splitlines())} lines)"
             )
-            return f"[DRY RUN] Would write → {path}"
+            return f"[DRY RUN] Would write -> {path}"
         path.write_text(content, encoding="utf-8")
         lines = len(content.splitlines())
         record_step(
-            agent_name, "write_file", filename,
+            cfg.name, "write_file", filename,
             f"Wrote {filename} ({lines} lines, {token_count(content)} tokens)"
         )
-        return f"Success: wrote {filename} ({lines} lines) → {path}"
+        return f"Success: wrote {filename} ({lines} lines) -> {path}"
 
     return [
         StructuredTool.from_function(
@@ -248,70 +380,21 @@ def make_file_tools(agent_name: str, dry_run: bool = False) -> list:
             name="write_file",
             description=(
                 f"Write content to a file in this agent's output directory. "
-                f"Allowed extensions for {agent_name}: {sorted(allowed)}"
+                f"Allowed extensions: {sorted(allowed)}"
             ),
         ),
     ]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SYSTEM PROMPTS
-# ─────────────────────────────────────────────────────────────────────────────
-
-SYSTEM_PROMPTS = {
-
-    "systems": """\
-You are a senior systems engineer. Your job is to translate a project goal
-into clear, structured requirements that a developer can implement directly.
-
-RULES:
-- Produce 5-10 concrete, testable requirements.
-- Save them as requirements.csv with exactly these columns:
-    id, title, description, priority, status
-  where priority is High / Med / Low and status is Open.
-- Do not add extra columns or change column names.
-- After saving, return a 2-3 sentence summary of what you defined.
-
-Your output directory already exists. Write directly using write_file.""",
-
-    "coding": """\
-You are a senior Python engineer. Your job is to implement working code
-that satisfies the project requirements.
-
-RULES:
-- Always start by calling read_file("requirements.csv") to load requirements.
-- Write clean, well-documented Python (docstrings + inline comments).
-- Save your implementation to a descriptively named .py file.
-- After saving, return a brief summary: what you built and which
-  requirement IDs your implementation covers.
-
-Your output directory already exists. Write directly using write_file.""",
-
-    "orchestrator": """\
-You are a project orchestrator coordinating two specialist agents:
-  - systems_agent  — breaks goals into requirements, writes requirements.csv
-  - coding_agent   — reads requirements and writes Python implementation
-
-YOUR WORKFLOW for every goal (follow this order):
-1. Call systems_agent with the goal to define and save requirements.
-2. Call coding_agent to implement the requirements.
-3. If a key requirement is clearly unaddressed in the code, request one
-   targeted revision from coding_agent (pass specific feedback). Max 1 revision.
-4. Return a concise final project summary:
-   agents called, files created, requirement coverage notes.
-
-Keep your delegation prompts specific and actionable.""",
-
-}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # AGENT FACTORY
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_agent(role: str, llm: ChatOpenAI, tools: list):
-    """Build a stateless LangChain 1.x agent graph for the given role."""
-    return create_agent(llm, tools=tools, system_prompt=SYSTEM_PROMPTS[role])
+def build_agent(cfg: AgentConfig, llm: ChatOpenAI, tools: list,
+                registry: dict[str, AgentConfig]):
+    """Build a stateless LangChain 1.x agent graph from an AgentConfig."""
+    prompt = resolve_prompt(cfg, registry)
+    return create_agent(llm, tools=tools, system_prompt=prompt)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -339,7 +422,6 @@ def invoke_agent(agent, task: str, label: str) -> str:
             continue
         last = msgs[-1]
 
-        # Print tool calls as they happen
         if hasattr(last, "tool_calls") and last.tool_calls:
             for tc in last.tool_calls:
                 args_preview = ", ".join(
@@ -347,7 +429,6 @@ def invoke_agent(agent, task: str, label: str) -> str:
                 )
                 print(f"  -> {tc['name']}({args_preview})")
 
-        # Print tool results
         elif hasattr(last, "tool_call_id") and last.tool_call_id:
             print(f"      = {str(last.content)[:120]}")
 
@@ -357,75 +438,75 @@ def invoke_agent(agent, task: str, label: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ORCHESTRATOR TOOLS  (sub-agents wrapped as callable tools)
+# ORCHESTRATOR TOOLS  (derived from orchestrator_cfg.handoffs — no hardcoding)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def make_orchestrator_tools(llm: ChatOpenAI, dry_run: bool = False) -> list:
+def make_handoff_tools(orch_cfg: AgentConfig, registry: dict[str, AgentConfig],
+                       llm: ChatOpenAI, dry_run: bool = False) -> list:
     """
-    Wrap each sub-agent as a LangChain tool the orchestrator agent can call.
+    Build one callable tool per agent listed in orch_cfg.handoffs.
+    The tool name is {agent_name}_agent, the docstring is cfg.description.
 
-    Context injection:
-      - systems_agent receives the raw goal only (no history needed on first call).
-      - coding_agent always receives the current state summary prepended to its
-        task — so it knows what the systems agent produced without being told.
-      - Both are token-capped before injection.
+    Context injection rule:
+      - Agents with predecessors in the handoff list receive the current state
+        summary prepended to their task (so they know what prior agents produced).
+      - The first agent in the handoff list receives only the raw task.
     """
-    systems_agent = build_agent("systems", llm, make_file_tools("systems", dry_run))
-    coding_agent  = build_agent("coding",  llm, make_file_tools("coding",  dry_run))
+    tools = []
 
-    def call_systems_agent(task: str) -> str:
-        """Delegate a requirements definition task to the systems engineering agent."""
-        output = invoke_agent(systems_agent, task, "systems agent")
-        record_step("systems", "agent_call", "", output[:300])
-        return output
+    for i, target_name in enumerate(orch_cfg.handoffs):
+        target_cfg  = registry[target_name]
+        sub_tools   = make_file_tools(target_cfg, registry, dry_run)
+        sub_agent   = build_agent(target_cfg, llm, sub_tools, registry)
+        inject_ctx  = i > 0    # inject state summary for all but the first agent
 
-    def call_coding_agent(task: str) -> str:
-        """Delegate a coding task to the Python coding agent."""
-        # Inject current state so the coding agent knows what requirements exist
-        ctx       = safe_inject(build_state_summary(), max_tokens=STATE_SUMMARY_TOKENS)
-        full_task = f"{ctx}\n\n---\nTASK: {task}"
-        output    = invoke_agent(coding_agent, full_task, "coding agent")
-        record_step("coding", "agent_call", "", output[:300])
-        return output
+        def make_caller(agent, name: str, cfg: AgentConfig, with_ctx: bool):
+            def call(task: str) -> str:
+                if with_ctx:
+                    ctx  = safe_inject(build_state_summary(), max_tokens=STATE_SUMMARY_TOKENS)
+                    task = f"{ctx}\n\n---\nTASK: {task}"
+                output = invoke_agent(agent, task, f"{name} agent")
+                record_step(name, "agent_call", "", output[:300])
+                return output
+            call.__doc__ = cfg.description
+            call.__name__ = f"call_{name}_agent"
+            return call
 
-    return [
-        StructuredTool.from_function(
-            func=call_systems_agent,
-            name="systems_agent",
-            description=(
-                "Delegate to the systems engineering agent. It will define "
-                "requirements and save them to requirements.csv. "
-                "Pass a clear task description that includes the full project goal."
+        caller = make_caller(sub_agent, target_name, target_cfg, inject_ctx)
+
+        tools.append(StructuredTool.from_function(
+            func        = caller,
+            name        = f"{target_name}_agent",
+            description = (
+                f"{target_cfg.description}. "
+                f"Writes to: output/{target_name}/. "
+                + ("Context from prior agents is injected automatically."
+                   if inject_ctx else
+                   "Pass the full project goal as the task.")
             ),
-        ),
-        StructuredTool.from_function(
-            func=call_coding_agent,
-            name="coding_agent",
-            description=(
-                "Delegate to the Python coding agent. It reads requirements.csv "
-                "and writes .py implementation files. "
-                "Current project context is injected automatically."
-            ),
-        ),
-    ]
+        ))
+
+    return tools
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RUN
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run(goal: str, llm: ChatOpenAI, dry_run: bool = False) -> None:
-    state["goal"] = goal
-    record_step("orchestrator", "start", "", f"Goal received: {goal}")
+def run(goal: str, llm: ChatOpenAI, dry_run: bool = False,
+        registry: dict[str, AgentConfig] = AGENT_REGISTRY) -> None:
 
-    orchestrator = build_agent(
-        "orchestrator", llm, make_orchestrator_tools(llm, dry_run)
-    )
+    state["goal"] = goal
+    record_step(ORCHESTRATOR_NAME, "start", "", f"Goal received: {goal}")
+
+    orch_cfg     = registry[ORCHESTRATOR_NAME]
+    orch_tools   = make_handoff_tools(orch_cfg, registry, llm, dry_run)
+    orchestrator = build_agent(orch_cfg, llm, orch_tools, registry)
 
     initial_task = (
         f"Goal: {goal}\n\n"
         f"{build_state_summary()}\n\n"
-        "Execute the full workflow: define requirements → implement code → final summary."
+        "Execute the full workflow: define requirements -> implement code -> final summary."
     )
 
     print(f"\n{'=' * 60}")
@@ -434,7 +515,7 @@ def run(goal: str, llm: ChatOpenAI, dry_run: bool = False) -> None:
         print("MODE: DRY RUN (no files will be written)")
     print(f"{'=' * 60}")
 
-    final_summary = invoke_agent(orchestrator, initial_task, "orchestrator")
+    final_summary = invoke_agent(orchestrator, initial_task, ORCHESTRATOR_NAME)
 
     print(f"\n{'=' * 60}")
     print("FINAL SUMMARY")
@@ -450,7 +531,7 @@ def run(goal: str, llm: ChatOpenAI, dry_run: bool = False) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Multi-agent system: orchestrator → systems engineer + coder",
+        description="Multi-agent system: orchestrator -> systems engineer + coder",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
